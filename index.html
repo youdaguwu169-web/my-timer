@@ -3,13 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mission Timer v2</title>
+    <title>Advanced Mission Timer</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
     <style>
+        :root {
+            --neon-blue: #00d2ff;
+            --neon-red: #ff4757;
+            --bg-dark: #0d1117;
+            --panel-bg: rgba(22, 27, 34, 0.8);
+        }
+
         body {
             font-family: 'Courier New', sans-serif;
-            background-color: #0d1117;
+            background-color: var(--bg-dark);
+            background: radial-gradient(circle at center, #1a1f25 0%, #0d1117 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,131 +25,169 @@
             margin: 0;
             color: white;
             overflow: hidden;
-            touch-action: none;
+            touch-action: none; /* 画面全体のスクロールを禁止 */
         }
-        .timer-card {
-            background: #161b22;
-            padding: 20px;
-            border-radius: 30px;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+
+        /* 画面全体に広がる背景演出 */
+        .scanline {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .timer-container {
+            position: relative;
             text-align: center;
-            width: 85%;
-            max-width: 400px;
-            border: 1px solid #30363d;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            box-sizing: border-box;
         }
+
+        /* 外側の数字レイアウト */
         .dial-outer {
             position: relative;
-            width: 280px;
-            height: 280px;
-            margin: 0 auto 20px;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto 40px;
             display: flex;
             justify-content: center;
             align-items: center;
         }
-        /* 時計のフレームと目盛り */
+
         #watch-dial {
             position: absolute;
-            width: 100%;
-            height: 100%;
+            width: 240px; /* 少し小さくして数字を外へ */
+            height: 240px;
             border-radius: 50%;
-            border: 8px solid #30363d;
-            box-sizing: border-box;
-            background: radial-gradient(circle, #1c2128 60%, #161b22 100%);
+            border: 4px solid #30363d;
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.2), inset 0 0 15px rgba(0, 0, 0, 0.5);
+            background: rgba(22, 27, 34, 0.5);
         }
-        /* 目盛り数字 (0, 15, 30, 45) */
+
+        /* 円の外側の数字 */
         .dial-label {
             position: absolute;
-            color: #8b949e;
-            font-size: 14px;
+            color: var(--neon-blue);
+            font-size: 20px;
             font-weight: bold;
+            text-shadow: 0 0 8px var(--neon-blue);
         }
-        .label-0  { top: 15px; }
-        .label-15 { right: 15px; }
-        .label-30 { bottom: 15px; }
-        .label-45 { left: 15px; }
+        .label-0  { top: 0; }
+        .label-15 { right: 0; top: 50%; transform: translateY(-50%); }
+        .label-30 { bottom: 0; }
+        .label-45 { left: 0; top: 50%; transform: translateY(-50%); }
 
-        /* 中央のドラムロールエリア */
+        /* ドラムロールエリア */
         .picker-group {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
             z-index: 10;
-            background: rgba(13, 17, 23, 0.6);
-            padding: 10px;
-            border-radius: 15px;
-            pointer-events: auto; /* ここだけスワイプを許可 */
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 20px;
+            border: 1px solid #30363d;
+            backdrop-filter: blur(5px);
         }
+
         .picker-column {
             height: 120px;
             overflow-y: scroll;
-            width: 55px;
+            width: 60px;
             scrollbar-width: none;
             scroll-snap-type: y mandatory;
         }
         .picker-column::-webkit-scrollbar { display: none; }
+        
         .picker-item {
             height: 40px;
             line-height: 40px;
-            font-size: 22px;
+            font-size: 24px;
             color: #484f58;
             scroll-snap-align: center;
+            transition: color 0.2s;
         }
         .picker-item.active {
-            color: #00d2ff;
+            color: var(--neon-blue);
             font-weight: bold;
-            font-size: 30px;
-            text-shadow: 0 0 10px #00d2ff;
+            font-size: 32px;
+            text-shadow: 0 0 15px var(--neon-blue);
         }
-        .unit { font-size: 12px; color: #8b949e; margin-right: 2px; }
 
-        .progress-container {
-            width: 100%; height: 8px;
-            background-color: #30363d;
-            border-radius: 10px; margin-bottom: 20px;
-            overflow: hidden;
+        .unit { font-size: 14px; color: #8b949e; margin-left: 2px; }
+
+        /* プログレスバー（画面下部に配置） */
+        .progress-fixed {
+            position: fixed;
+            bottom: 0; left: 0; width: 100%; height: 10px;
+            background: #161b22;
         }
         #progress-bar {
             width: 100%; height: 100%;
-            background-color: #00d2ff;
+            background: linear-gradient(90deg, #00d2ff, #00ff88);
+            box-shadow: 0 -2px 10px var(--neon-blue);
             transition: width 1s linear;
         }
-        .button-group { display: flex; gap: 10px; }
-        button {
-            flex: 1; padding: 15px; border-radius: 10px; border: none;
-            font-weight: bold; cursor: pointer;
+
+        /* 操作ボタン */
+        .button-group {
+            display: flex;
+            gap: 15px;
+            padding: 0 20px;
         }
-        #startBtn { background: #238636; color: white; }
-        #stopBtn { background: #d29922; color: white; }
-        #resetBtn { background: #30363d; color: white; }
+        button {
+            flex: 1;
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        #startBtn { background: #238636; color: white; border: none; box-shadow: 0 0 15px rgba(35, 134, 54, 0.4); }
+        #stopBtn { background: #d29922; color: white; border: none; }
+        #resetBtn { background: transparent; color: #8b949e; }
+
+        .complete-text { color: #00ff00; font-size: 28px; text-shadow: 0 0 20px #00ff00; }
     </style>
 </head>
 <body>
 
-<div class="timer-card">
-    <div class="progress-container">
-        <div id="progress-bar"></div>
-    </div>
+<div class="scanline"></div>
 
+<div class="timer-container">
     <div class="dial-outer" id="touch-area">
-        <div id="watch-dial"></div>
-        <div class="dial-label label-0">0</div>
+        <div class="dial-label label-0">60</div>
         <div class="dial-label label-15">15</div>
         <div class="dial-label label-30">30</div>
         <div class="dial-label label-45">45</div>
         
+        <div id="watch-dial"></div>
+        
         <div class="picker-group" id="picker-ui">
-            <div class="picker-column" id="h-col"></div><span class="unit">h</span>
-            <div class="picker-column" id="m-col"></div><span class="unit">m</span>
-            <div class="picker-column" id="s-col"></div><span class="unit">s</span>
+            <div class="picker-column" id="h-col"></div><span class="unit">H</span>
+            <div class="picker-column" id="m-col"></div><span class="unit">M</span>
+            <div class="picker-column" id="s-col"></div><span class="unit">S</span>
         </div>
     </div>
 
     <div class="button-group">
-        <button id="startBtn">START</button>
-        <button id="stopBtn">ABORT</button>
-        <button id="resetBtn">RESET</button>
+        <button id="startBtn">Initiate</button>
+        <button id="stopBtn">Abort</button>
+        <button id="resetBtn">Reset</button>
     </div>
+</div>
+
+<div class="progress-fixed">
+    <div id="progress-bar"></div>
 </div>
 
 <script>
@@ -150,13 +196,14 @@
     const hCol = document.getElementById('h-col');
     const mCol = document.getElementById('m-col');
     const sCol = document.getElementById('s-col');
+    const pickerUI = document.getElementById('picker-ui');
 
     const createPicker = (col, max) => {
         col.innerHTML = '<div class="picker-item"></div>'; 
         for (let i = 0; i <= max; i++) {
             const div = document.createElement('div');
             div.className = 'picker-item';
-            div.textContent = i;
+            div.textContent = i.toString().padStart(2, '0');
             col.appendChild(div);
         }
         col.innerHTML += '<div class="picker-item"></div>';
@@ -183,38 +230,37 @@
         col.scrollTo({ top: val * 40, behavior: 'auto' });
     };
 
-    // 初期位置設定
-    setTimeout(() => { setVal(mCol, 3); }, 100);
+    // 初期値
+    setTimeout(() => { setVal(mCol, 3); setVal(sCol, 0); }, 100);
 
-    // 外側の円をなぞる操作
+    // なぞる操作の処理
     let isDragging = false;
     const touchArea = document.getElementById('touch-area');
-    const pickerUI = document.getElementById('picker-ui');
 
     touchArea.addEventListener('touchstart', (e) => {
-        // ドラムロール部分を触っている時は「なぞる」を無効化
         if (pickerUI.contains(e.target)) return;
         isDragging = true;
-        handleCircleTouch(e.touches[0]);
+        handleTouch(e.touches[0]);
     });
 
     touchArea.addEventListener('touchmove', (e) => {
         if (!isDragging || timerId) return;
-        handleCircleTouch(e.touches[0]);
+        handleTouch(e.touches[0]);
     });
 
     touchArea.addEventListener('touchend', () => isDragging = false);
 
-    function handleCircleTouch(touch) {
+    function handleTouch(touch) {
         const rect = touchArea.getBoundingClientRect();
         const x = touch.clientX - (rect.left + rect.width / 2);
         const y = touch.clientY - (rect.top + rect.height / 2);
         let angle = Math.atan2(y, x) * (180 / Math.PI);
-        angle = (angle + 450) % 360; // 0度を真上に調整
-        let minute = Math.floor(angle / 6); // 360度 / 60分 = 6度
+        angle = (angle + 450) % 360; 
+        let minute = Math.floor(angle / 6); 
         setVal(mCol, minute);
     }
 
+    // 通知関連
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
     }
@@ -223,7 +269,7 @@
         if (Notification.permission === "granted") {
             navigator.serviceWorker.ready.then(reg => {
                 reg.showNotification("MISSION COMPLETE", {
-                    body: "タイマーが終了しました", icon: "icon.png"
+                    body: "Operation successfully finished.", icon: "icon.png"
                 });
             });
         }
@@ -247,7 +293,8 @@
                 clearInterval(timerId);
                 timerId = null;
                 showNotification();
-                alert("MISSION COMPLETE");
+                document.querySelector('.timer-container').innerHTML = '<div class="complete-text">MISSION COMPLETE</div>';
+                setTimeout(() => location.reload(), 5000);
             }
         }, 1000);
     };
