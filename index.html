@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mission Timer</title>
+    
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" href="icon.png">
+
     <style>
-        /* --- デザインはそのまま維持 --- */
         body {
             font-family: 'Courier New', sans-serif;
             background-color: #0d1117;
@@ -116,23 +119,17 @@
         let timerId = null;
         let totalTime = 0;
 
-        // --- 通知設定 ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
-
-        const requestNotificationPermission = async () => {
-            if (Notification.permission !== "granted") {
-                await Notification.requestPermission();
-            }
-        };
 
         const showNotification = () => {
             if (Notification.permission === "granted") {
                 navigator.serviceWorker.ready.then(registration => {
                     registration.showNotification("MISSION COMPLETE", {
                         body: "タイマーが終了しました。",
-                        icon: "https://vercel.com/favicon.ico", // アイコンは自由に変更可能
+                        icon: "icon.png",
+                        badge: "icon.png",
                         vibrate: [200, 100, 200]
                     });
                 });
@@ -148,9 +145,8 @@
         });
 
         document.getElementById('startBtn').onclick = async () => {
-            // スタート時に通知許可を求める
-            await requestNotificationPermission();
-
+            const permission = await Notification.requestPermission();
+            
             if (timerId) return;
 
             const el = getEl();
@@ -182,8 +178,6 @@
                     timerId = null;
                     el.display.innerHTML = '<span class="complete-text">MISSION COMPLETE</span>';
                     document.body.classList.add('hacking-glitch');
-
-                    // 通知を実行
                     showNotification();
                 }
             }, 1000);
