@@ -2,14 +2,13 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Grand Mission Timer</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
     <style>
         :root {
             --neon-blue: #00d2ff;
-            --neon-red: #ff4757;
             --bg-dark: #0d1117;
             --panel-bg: rgba(22, 27, 34, 0.85);
         }
@@ -17,7 +16,8 @@
         body {
             font-family: 'Courier New', sans-serif;
             background-color: var(--bg-dark);
-            background: radial-gradient(circle at center, #1a1f25 0%, #0d1117 100%);
+            /* 背景を全体に広げ、位置を固定 */
+            background: radial-gradient(circle at center, #1a1f25 0%, #0d1117 100%) fixed;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -38,54 +38,52 @@
         }
 
         .timer-container {
-            position: relative;
-            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             width: 100%;
-            max-width: 500px;
-            padding: 10px;
+            max-width: 100vw;
+            padding: 20px;
             box-sizing: border-box;
         }
 
-        /* ここを大きく調整: 
-           円の外側に数字を置くための十分なスペース (420px) を確保 
+        /* 右に寄る問題を解決: 
+           widthを固定値ではなく、画面幅に合わせた可変（min関数）に変更
         */
         .dial-outer {
             position: relative;
-            width: 420px; 
-            height: 420px;
-            margin: 0 auto 20px;
+            width: min(90vw, 400px); 
+            height: min(90vw, 400px);
+            margin-bottom: 30px;
             display: flex;
             justify-content: center;
             align-items: center;
-            /* iPhone SEなどの小さい画面でもはみ出さないようスケール調整 */
-            transform: scale(0.9);
         }
 
-        /* 画像のような太いネオンの円 */
         #watch-dial {
             position: absolute;
-            width: 350px; 
-            height: 350px;
+            width: 85%;
+            height: 85%;
             border-radius: 50%;
             border: 4px solid var(--neon-blue);
-            box-shadow: 0 0 25px var(--neon-blue), inset 0 0 15px var(--neon-blue);
+            box-shadow: 0 0 20px var(--neon-blue), inset 0 0 15px var(--neon-blue);
             background: transparent;
         }
 
-        /* 数字を円の「完全外側」へ配置 */
         .dial-label {
             position: absolute;
             color: var(--neon-blue);
-            font-size: 24px;
+            font-size: min(6vw, 24px);
             font-weight: bold;
             text-shadow: 0 0 10px var(--neon-blue);
             z-index: 5;
         }
-        /* 円の半径が175pxなので、それより遠い位置に設定 */
-        .label-0  { top: -5px; }
-        .label-15 { right: -5px; top: 50%; transform: translateY(-50%); }
-        .label-30 { bottom: -5px; }
-        .label-45 { left: -5px; top: 50%; transform: translateY(-50%); }
+        
+        /* 数字を円の外側に均等に配置 */
+        .label-0  { top: 0%; }
+        .label-15 { right: 0%; top: 50%; transform: translateY(-50%); }
+        .label-30 { bottom: 0%; }
+        .label-45 { left: 0%; top: 50%; transform: translateY(-50%); }
 
         .picker-group {
             display: flex;
@@ -94,18 +92,17 @@
             gap: 10px;
             z-index: 10;
             background: var(--panel-bg);
-            padding: 20px;
-            border-radius: 25px;
+            padding: 15px;
+            border-radius: 20px;
             border: 1px solid #30363d;
             backdrop-filter: blur(8px);
-            /* ドラムロールが円の中に綺麗に収まるサイズ */
-            width: 260px;
+            width: min(70vw, 260px);
         }
 
         .picker-column {
-            height: 120px;
+            height: 100px;
             overflow-y: scroll;
-            width: 60px;
+            width: 25%;
             scrollbar-width: none;
             scroll-snap-type: y mandatory;
         }
@@ -114,54 +111,46 @@
         .picker-item {
             height: 40px;
             line-height: 40px;
-            font-size: 26px;
+            font-size: 22px;
             color: #484f58;
             scroll-snap-align: center;
-            transition: color 0.2s;
         }
         .picker-item.active {
             color: var(--neon-blue);
             font-weight: bold;
-            font-size: 34px;
+            font-size: 28px;
             text-shadow: 0 0 15px var(--neon-blue);
         }
 
-        .unit { font-size: 16px; color: #8b949e; margin-left: 2px; }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            width: min(90vw, 400px);
+        }
+        button {
+            flex: 1;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        #startBtn { background: #238636; color: white; border: none; }
+        #stopBtn { background: #d29922; color: white; border: none; }
+        #resetBtn { background: transparent; color: #8b949e; }
 
         .progress-fixed {
             position: fixed;
-            bottom: 0; left: 0; width: 100%; height: 12px;
+            bottom: 0; left: 0; width: 100%; height: 10px;
             background: #161b22;
         }
         #progress-bar {
             width: 100%; height: 100%;
             background: linear-gradient(90deg, #00d2ff, #00ff88);
-            box-shadow: 0 -3px 15px var(--neon-blue);
             transition: width 1s linear;
         }
-
-        .button-group {
-            display: flex;
-            gap: 15px;
-            padding: 0 15px;
-        }
-        button {
-            flex: 1;
-            padding: 20px;
-            border-radius: 15px;
-            border: 1px solid #30363d;
-            font-weight: bold;
-            font-size: 18px;
-            cursor: pointer;
-            transition: 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-        #startBtn { background: #238636; color: white; border: none; box-shadow: 0 0 20px rgba(35, 134, 54, 0.5); }
-        #stopBtn { background: #d29922; color: white; border: none; }
-        #resetBtn { background: transparent; color: #8b949e; }
-
-        .complete-text { color: #00ff00; font-size: 32px; text-shadow: 0 0 30px #00ff00; }
     </style>
 </head>
 <body>
@@ -174,16 +163,13 @@
         <div class="dial-label label-15">15</div>
         <div class="dial-label label-30">30</div>
         <div class="dial-label label-45">45</div>
-        
         <div id="watch-dial"></div>
-        
         <div class="picker-group" id="picker-ui">
-            <div class="picker-column" id="h-col"></div><span class="unit">H</span>
-            <div class="picker-column" id="m-col"></div><span class="unit">M</span>
-            <div class="picker-column" id="s-col"></div><span class="unit">S</span>
+            <div class="picker-column" id="h-col"></div><span style="color:#8b949e">H</span>
+            <div class="picker-column" id="m-col"></div><span style="color:#8b949e">M</span>
+            <div class="picker-column" id="s-col"></div><span style="color:#8b949e">S</span>
         </div>
     </div>
-
     <div class="button-group">
         <button id="startBtn">Initiate</button>
         <button id="stopBtn">Abort</button>
@@ -191,9 +177,7 @@
     </div>
 </div>
 
-<div class="progress-fixed">
-    <div id="progress-bar"></div>
-</div>
+<div class="progress-fixed"><div id="progress-bar"></div></div>
 
 <script>
     let timerId = null;
@@ -212,15 +196,13 @@
             col.appendChild(div);
         }
         col.innerHTML += '<div class="picker-item"></div>';
-        col.addEventListener('scroll', () => updateActive(col));
-    };
-
-    const updateActive = (col) => {
-        const center = col.scrollTop + 60;
-        const items = col.getElementsByClassName('picker-item');
-        Array.from(items).forEach(item => {
-            const itemCenter = item.offsetTop + 20;
-            item.classList.toggle('active', Math.abs(center - itemCenter) < 20);
+        col.addEventListener('scroll', () => {
+            const center = col.scrollTop + 50;
+            const items = col.getElementsByClassName('picker-item');
+            Array.from(items).forEach(item => {
+                const itemCenter = item.offsetTop + 20;
+                item.classList.toggle('active', Math.abs(center - itemCenter) < 20);
+            });
         });
     };
 
@@ -259,32 +241,15 @@
         const y = touch.clientY - (rect.top + rect.height / 2);
         let angle = Math.atan2(y, x) * (180 / Math.PI);
         angle = (angle + 450) % 360; 
-        let minute = Math.floor(angle / 6); 
-        setVal(mCol, minute);
+        setVal(mCol, Math.floor(angle / 6));
     }
-
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
-    }
-
-    const showNotification = () => {
-        if (Notification.permission === "granted") {
-            navigator.serviceWorker.ready.then(reg => {
-                reg.showNotification("MISSION COMPLETE", {
-                    body: "Operation successfully finished.", icon: "icon.png"
-                });
-            });
-        }
-    };
 
     document.getElementById('startBtn').onclick = async () => {
-        await Notification.requestPermission();
         if (timerId) return;
         let timeLeft = getVal(hCol) * 3600 + getVal(mCol) * 60 + getVal(sCol);
         if (timeLeft <= 0) return;
         totalTime = timeLeft;
         pickerUI.style.pointerEvents = "none";
-        
         timerId = setInterval(() => {
             timeLeft--;
             setVal(hCol, Math.floor(timeLeft / 3600));
@@ -294,9 +259,8 @@
             if (timeLeft <= 0) {
                 clearInterval(timerId);
                 timerId = null;
-                showNotification();
-                document.querySelector('.timer-container').innerHTML = '<div class="complete-text">MISSION COMPLETE</div>';
-                setTimeout(() => location.reload(), 5000);
+                alert("MISSION COMPLETE");
+                location.reload();
             }
         }, 1000);
     };
