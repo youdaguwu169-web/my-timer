@@ -2,12 +2,10 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mission Timer</title>
-    
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
-
     <style>
         body {
             font-family: 'Courier New', sans-serif;
@@ -18,181 +16,223 @@
             height: 100vh;
             margin: 0;
             color: white;
-            transition: background-color 0.5s;
-            touch-action: manipulation;
+            overflow: hidden;
+            touch-action: none;
         }
         .timer-card {
             background: #161b22;
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 30px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
             text-align: center;
-            width: 90%;
-            max-width: 500px;
+            width: 85%;
+            max-width: 400px;
             border: 1px solid #30363d;
         }
-        .progress-container {
-            width: 100%;
-            height: 12px;
-            background-color: #30363d;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            overflow: hidden;
-        }
-        #progress-bar {
-            width: 100%;
-            height: 100%;
-            background-color: #00d2ff;
-            box-shadow: 0 0 10px #00d2ff;
-            transition: width 1s linear, background-color 0.5s;
-        }
-        #display {
-            font-size: 20px;
-            margin-bottom: 30px;
+        .dial-container {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            margin: 0 auto 20px;
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 5px;
         }
-        input[type="number"] {
-            font-size: 32px;
-            width: 70px;
-            background: #0d1117;
-            border: 2px solid #30363d;
-            border-radius: 10px;
-            text-align: center;
-            color: #00d2ff;
-            outline: none;
-            font-family: inherit;
+        #watch-dial {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 4px solid #30363d;
+            box-shadow: inset 0 0 20px rgba(0, 210, 255, 0.1);
         }
-        input:disabled { color: #8b949e; border-color: #21262d; }
-        .button-group {
+        .picker-group {
             display: flex;
-            flex-wrap: wrap;
             justify-content: center;
+            align-items: center;
             gap: 10px;
+            z-index: 10;
         }
-        button {
-            font-size: 16px;
-            padding: 12px 20px;
-            cursor: pointer;
-            border: none;
-            border-radius: 8px;
+        .picker-column {
+            height: 120px;
+            overflow-y: scroll;
+            width: 60px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            scroll-snap-type: y mandatory;
+        }
+        .picker-column::-webkit-scrollbar { display: none; }
+        .picker-item {
+            height: 40px;
+            line-height: 40px;
+            font-size: 24px;
+            color: #8b949e;
+            scroll-snap-align: center;
+            transition: 0.2s;
+        }
+        .picker-item.active {
+            color: #00d2ff;
             font-weight: bold;
-            flex: 1;
-            min-width: 100px;
-            transition: 0.3s;
+            font-size: 32px;
+            text-shadow: 0 0 10px #00d2ff;
         }
-        #startBtn { background-color: #238636; color: white; }
-        #stopBtn  { background-color: #d29922; color: white; }
-        #resetBtn { background-color: #8b949e; color: white; }
-        .hacking-glitch { animation: glitch-flash 0.5s ease-out; }
-        @keyframes glitch-flash {
-            0% { background-color: #00ff00; }
-            50% { background-color: #000; }
-            100% { background-color: #0d1117; }
+        .unit { font-size: 14px; color: #8b949e; }
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background-color: #30363d;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
         }
-        .complete-text { color: #00ff00 !important; font-size: 28px !important; text-shadow: 0 0 10px #00ff00; }
+        #progress-bar {
+            width: 100%; height: 100%;
+            background-color: #00d2ff;
+            transition: width 1s linear;
+        }
+        .button-group { display: flex; gap: 10px; }
+        button {
+            flex: 1; padding: 15px; border-radius: 10px; border: none;
+            font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        #startBtn { background: #238636; color: white; }
+        #stopBtn { background: #d29922; color: white; }
+        #resetBtn { background: #30363d; color: white; }
+        .complete-text { color: #00ff00; font-size: 24px; }
     </style>
 </head>
 <body>
 
-    <div class="timer-card">
-        <div class="progress-container">
-            <div id="progress-bar"></div>
-        </div>
+<div class="timer-card">
+    <div class="progress-container">
+        <div id="progress-bar"></div>
+    </div>
 
-        <div id="display">
-            <input type="number" id="h" value="0" min="0" inputmode="numeric" pattern="\d*">時
-            <input type="number" id="m" value="3" min="0" max="59" inputmode="numeric" pattern="\d*">分
-            <input type="number" id="s" value="0" min="0" max="59" inputmode="numeric" pattern="\d*">秒
-        </div>
-
-        <div class="button-group">
-            <button id="startBtn">START</button>
-            <button id="stopBtn">ABORT</button>
-            <button id="resetBtn">RESET</button>
+    <div class="dial-container" id="touch-area">
+        <div id="watch-dial"></div>
+        <div class="picker-group" id="display-ui">
+            <div class="picker-column" id="h-col"></div><span class="unit">h</span>
+            <div class="picker-column" id="m-col"></div><span class="unit">m</span>
+            <div class="picker-column" id="s-col"></div><span class="unit">s</span>
         </div>
     </div>
 
-    <script>
-        let timerId = null;
-        let totalTime = 0;
+    <div class="button-group">
+        <button id="startBtn">START</button>
+        <button id="stopBtn">ABORT</button>
+        <button id="resetBtn">RESET</button>
+    </div>
+</div>
 
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+<script>
+    let timerId = null;
+    let totalTime = 0;
+    const hCol = document.getElementById('h-col');
+    const mCol = document.getElementById('m-col');
+    const sCol = document.getElementById('s-col');
+
+    const createPicker = (col, max) => {
+        col.innerHTML = '<div class="picker-item"></div>'; 
+        for (let i = 0; i <= max; i++) {
+            const div = document.createElement('div');
+            div.className = 'picker-item';
+            div.textContent = i;
+            col.appendChild(div);
         }
+        col.innerHTML += '<div class="picker-item"></div>';
+        col.onscroll = () => updateActive(col);
+    };
 
-        const showNotification = () => {
-            if (Notification.permission === "granted") {
-                navigator.serviceWorker.ready.then(registration => {
-                    registration.showNotification("MISSION COMPLETE", {
-                        body: "タイマーが終了しました。",
-                        icon: "icon.png",
-                        badge: "icon.png",
-                        vibrate: [200, 100, 200]
-                    });
-                });
-            }
-        };
-
-        const getEl = () => ({
-            h: document.getElementById('h'),
-            m: document.getElementById('m'),
-            s: document.getElementById('s'),
-            bar: document.getElementById('progress-bar'),
-            display: document.getElementById('display')
+    const updateActive = (col) => {
+        const items = col.getElementsByClassName('picker-item');
+        const center = col.scrollTop + 60;
+        Array.from(items).forEach(item => {
+            const itemCenter = item.offsetTop + 20;
+            item.classList.toggle('active', Math.abs(center - itemCenter) < 20);
         });
+    };
 
-        document.getElementById('startBtn').onclick = async () => {
-            const permission = await Notification.requestPermission();
-            
-            if (timerId) return;
+    createPicker(hCol, 23);
+    createPicker(mCol, 59);
+    createPicker(sCol, 59);
 
-            const el = getEl();
-            let timeLeft = (parseInt(el.h.value) || 0) * 3600 + (parseInt(el.m.value) || 0) * 60 + (parseInt(el.s.value) || 0);
+    const getVal = (col) => {
+        const active = col.querySelector('.active');
+        return active ? parseInt(active.textContent) || 0 : 0;
+    };
 
-            if (timeLeft <= 0) return;
+    const setVal = (col, val) => {
+        col.scrollTo({ top: val * 40, behavior: 'smooth' });
+    };
 
-            totalTime = timeLeft;
-            el.h.disabled = el.m.disabled = el.s.disabled = true;
+    let startAngle = 0;
+    let startVal = 0;
+    document.getElementById('touch-area').addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = touch.clientX - (rect.left + rect.width / 2);
+        const y = touch.clientY - (rect.top + rect.height / 2);
+        startAngle = Math.atan2(y, x);
+        startVal = getVal(mCol);
+    });
 
-            timerId = setInterval(() => {
-                timeLeft--;
+    document.getElementById('touch-area').addEventListener('touchmove', (e) => {
+        if (timerId) return;
+        const touch = e.touches[0];
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = touch.clientX - (rect.left + rect.width / 2);
+        const y = touch.clientY - (rect.top + rect.height / 2);
+        const currentAngle = Math.atan2(y, x);
+        let diff = Math.round((currentAngle - startAngle) * (60 / (Math.PI * 2)));
+        let newVal = (startVal + diff + 60) % 60;
+        setVal(mCol, newVal);
+    });
 
-                el.h.value = Math.floor(timeLeft / 3600);
-                el.m.value = Math.floor((timeLeft % 3600) / 60);
-                el.s.value = timeLeft % 60;
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
 
-                const ratio = (timeLeft / totalTime) * 100;
-                el.bar.style.width = ratio + "%";
+    const showNotification = () => {
+        if (Notification.permission === "granted") {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification("MISSION COMPLETE", {
+                    body: "タイマー終了", icon: "icon.png", badge: "icon.png"
+                });
+            });
+        }
+    };
 
-                if (ratio < 20) {
-                    el.bar.style.backgroundColor = "#ff4757";
-                } else if (ratio < 50) {
-                    el.bar.style.backgroundColor = "#ffa502";
-                }
+    document.getElementById('startBtn').onclick = async () => {
+        await Notification.requestPermission();
+        if (timerId) return;
+        let timeLeft = getVal(hCol) * 3600 + getVal(mCol) * 60 + getVal(sCol);
+        if (timeLeft <= 0) return;
+        totalTime = timeLeft;
+        hCol.style.pointerEvents = mCol.style.pointerEvents = sCol.style.pointerEvents = "none";
+        
+        timerId = setInterval(() => {
+            timeLeft--;
+            setVal(hCol, Math.floor(timeLeft / 3600));
+            setVal(mCol, Math.floor((timeLeft % 3600) / 60));
+            setVal(sCol, timeLeft % 60);
+            const ratio = (timeLeft / totalTime) * 100;
+            document.getElementById('progress-bar').style.width = ratio + "%";
+            if (timeLeft <= 0) {
+                clearInterval(timerId);
+                timerId = null;
+                showNotification();
+                document.getElementById('display-ui').innerHTML = '<div class="complete-text">COMPLETE</div>';
+            }
+        }, 1000);
+    };
 
-                if (timeLeft <= 0) {
-                    clearInterval(timerId);
-                    timerId = null;
-                    el.display.innerHTML = '<span class="complete-text">MISSION COMPLETE</span>';
-                    document.body.classList.add('hacking-glitch');
-                    showNotification();
-                }
-            }, 1000);
-        };
+    document.getElementById('stopBtn').onclick = () => {
+        clearInterval(timerId);
+        timerId = null;
+        hCol.style.pointerEvents = mCol.style.pointerEvents = sCol.style.pointerEvents = "auto";
+    };
 
-        document.getElementById('stopBtn').onclick = () => {
-            clearInterval(timerId);
-            timerId = null;
-            const el = getEl();
-            if(el.h) el.h.disabled = el.m.disabled = el.s.disabled = false;
-        };
-
-        document.getElementById('resetBtn').onclick = () => {
-            location.reload();
-        };
-    </script>
+    document.getElementById('resetBtn').onclick = () => location.reload();
+</script>
 </body>
 </html>
