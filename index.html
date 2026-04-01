@@ -24,15 +24,6 @@
             touch-action: none;
         }
 
-        .scanline {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
-            z-index: 100;
-        }
-
         .timer-container {
             display: flex;
             flex-direction: column;
@@ -40,10 +31,11 @@
             width: 100%;
         }
 
+        /* 外枠を広げて数字を外側に配置 */
         .dial-outer {
             position: relative;
-            width: min(92vw, 400px); 
-            height: min(92vw, 400px);
+            width: min(98vw, 440px); 
+            height: min(98vw, 440px);
             margin-bottom: 20px;
             display: flex;
             justify-content: center;
@@ -52,8 +44,8 @@
 
         #watch-dial {
             position: absolute;
-            width: 80%;
-            height: 80%;
+            width: 75%;
+            height: 75%;
             border-radius: 50%;
             border: 4px solid var(--neon-blue);
             box-shadow: 0 0 20px var(--neon-blue), inset 0 0 15px var(--neon-blue);
@@ -63,19 +55,18 @@
         .dial-label {
             position: absolute;
             color: var(--neon-blue);
-            font-size: min(5vw, 20px);
+            font-size: min(5vw, 22px);
             font-weight: bold;
             text-shadow: 0 0 10px var(--neon-blue);
             z-index: 5;
         }
         
-        /* 数字を円のより内側に寄せて、パネルともぶつからない位置(12%)に調整 */
-        .label-0  { top: 12%; }
-        .label-15 { right: 12%; top: 50%; transform: translateY(-50%); }
-        .label-30 { bottom: 12%; }
-        .label-45 { left: 12%; top: 50%; transform: translateY(-50%); }
+        /* 円の外側に配置 */
+        .label-0  { top: 2%; }
+        .label-15 { right: 2%; top: 50%; transform: translateY(-50%); }
+        .label-30 { bottom: 2%; }
+        .label-45 { left: 2%; top: 50%; transform: translateY(-50%); }
 
-        /* 真ん中の図形を小さくしました */
         .picker-group {
             display: flex;
             justify-content: center;
@@ -87,13 +78,13 @@
             border-radius: 20px;
             border: 1px solid #30363d;
             backdrop-filter: blur(10px);
-            width: min(55vw, 210px); /* 幅をさらに縮小 */
+            width: min(55vw, 200px);
         }
 
         .picker-column {
             height: 80px;
             overflow-y: scroll;
-            width: 45px;
+            width: 42px;
             scrollbar-width: none;
             scroll-snap-type: y mandatory;
         }
@@ -135,8 +126,6 @@
 </head>
 <body>
 
-<div class="scanline"></div>
-
 <div class="timer-container">
     <div class="dial-outer" id="touch-area">
         <div class="dial-label label-0">60</div>
@@ -145,9 +134,9 @@
         <div class="dial-label label-45">45</div>
         <div id="watch-dial"></div>
         <div class="picker-group" id="picker-ui">
-            <div class="picker-column" id="h-col"></div><span style="font-size:12px;color:#8b949e">H</span>
-            <div class="picker-column" id="m-col"></div><span style="font-size:12px;color:#8b949e">M</span>
-            <div class="picker-column" id="s-col"></div><span style="font-size:12px;color:#8b949e">S</span>
+            <div class="picker-column" id="h-col"></div><span style="font-size:10px;color:#8b949e">H</span>
+            <div class="picker-column" id="m-col"></div><span style="font-size:10px;color:#8b949e">M</span>
+            <div class="picker-column" id="s-col"></div><span style="font-size:10px;color:#8b949e">S</span>
         </div>
     </div>
     <div class="button-group">
@@ -164,17 +153,6 @@
     const sCol = document.getElementById('s-col');
     const pickerUI = document.getElementById('picker-ui');
     const touchArea = document.getElementById('touch-area');
-
-    // 音声
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function beep() {
-        const o = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        o.connect(g); g.connect(audioCtx.destination);
-        o.type = 'square'; o.frequency.value = 880;
-        g.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        o.start(); o.stop(audioCtx.currentTime + 0.1);
-    }
 
     const createPicker = (col, max) => {
         col.innerHTML = '<div class="picker-item"></div>'; 
@@ -197,27 +175,33 @@
 
     createPicker(hCol, 23); createPicker(mCol, 59); createPicker(sCol, 59);
 
-    const getVal = (col) => {
-        const active = col.querySelector('.active');
-        return active ? parseInt(active.textContent) || 0 : 0;
-    };
-
     const setVal = (col, val) => {
         col.scrollTo({ top: val * 40, behavior: 'auto' });
     };
 
     setTimeout(() => { setVal(mCol, 3); setVal(sCol, 0); }, 100);
 
-    // タッチ操作ロジック
+    // 操作モード管理
     let isDragging = false;
+    let currentMode = 'm'; // 'm' (分) または 's' (秒)
+
     touchArea.addEventListener('touchstart', (e) => {
         if (pickerUI.contains(e.target)) return;
-        isDragging = true; handleTouch(e.touches[0]);
+        const rect = touchArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        
+        // 触り始めた瞬間に左右でモードを決定
+        currentMode = (e.touches[0].clientX > centerX) ? 's' : 'm';
+        
+        isDragging = true;
+        handleTouch(e.touches[0]);
     });
+
     touchArea.addEventListener('touchmove', (e) => {
         if (!isDragging || timerId) return;
         handleTouch(e.touches[0]);
     });
+
     touchArea.addEventListener('touchend', () => isDragging = false);
 
     function handleTouch(touch) {
@@ -231,17 +215,21 @@
         angle = (angle + 450) % 360; 
         const value = Math.floor(angle / 6);
 
-        // 画面の右半分を触っていれば「秒」、左半分なら「分」を変更
-        if (touch.clientX > centerX) {
+        // モードに従って全周(0-59)で値を設定
+        if (currentMode === 's') {
             setVal(sCol, value);
         } else {
             setVal(mCol, value);
         }
     }
 
+    // --- タイマー実行ロジック (省略せず記述) ---
     document.getElementById('startBtn').onclick = () => {
-        if (audioCtx.state === 'suspended') audioCtx.resume();
         if (timerId) return;
+        const getVal = (col) => {
+            const active = col.querySelector('.active');
+            return active ? parseInt(active.textContent) || 0 : 0;
+        };
         let timeLeft = getVal(hCol) * 3600 + getVal(mCol) * 60 + getVal(sCol);
         if (timeLeft <= 0) return;
         pickerUI.style.pointerEvents = "none";
@@ -252,7 +240,6 @@
             setVal(sCol, timeLeft % 60);
             if (timeLeft <= 0) {
                 clearInterval(timerId); timerId = null;
-                for(let i=0; i<5; i++) setTimeout(beep, i*250);
                 alert("MISSION COMPLETE"); location.reload();
             }
         }, 1000);
