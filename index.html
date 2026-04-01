@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mission Timer</title>
+    <title>Mission Timer v2</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
     <style>
@@ -29,60 +29,76 @@
             max-width: 400px;
             border: 1px solid #30363d;
         }
-        .dial-container {
+        .dial-outer {
             position: relative;
-            width: 250px;
-            height: 250px;
+            width: 280px;
+            height: 280px;
             margin: 0 auto 20px;
             display: flex;
             justify-content: center;
             align-items: center;
         }
+        /* 時計のフレームと目盛り */
         #watch-dial {
             position: absolute;
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            border: 4px solid #30363d;
-            box-shadow: inset 0 0 20px rgba(0, 210, 255, 0.1);
+            border: 8px solid #30363d;
+            box-sizing: border-box;
+            background: radial-gradient(circle, #1c2128 60%, #161b22 100%);
         }
+        /* 目盛り数字 (0, 15, 30, 45) */
+        .dial-label {
+            position: absolute;
+            color: #8b949e;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .label-0  { top: 15px; }
+        .label-15 { right: 15px; }
+        .label-30 { bottom: 15px; }
+        .label-45 { left: 15px; }
+
+        /* 中央のドラムロールエリア */
         .picker-group {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 10px;
+            gap: 5px;
             z-index: 10;
+            background: rgba(13, 17, 23, 0.6);
+            padding: 10px;
+            border-radius: 15px;
+            pointer-events: auto; /* ここだけスワイプを許可 */
         }
         .picker-column {
             height: 120px;
             overflow-y: scroll;
-            width: 60px;
+            width: 55px;
             scrollbar-width: none;
-            -ms-overflow-style: none;
             scroll-snap-type: y mandatory;
         }
         .picker-column::-webkit-scrollbar { display: none; }
         .picker-item {
             height: 40px;
             line-height: 40px;
-            font-size: 24px;
-            color: #8b949e;
+            font-size: 22px;
+            color: #484f58;
             scroll-snap-align: center;
-            transition: 0.2s;
         }
         .picker-item.active {
             color: #00d2ff;
             font-weight: bold;
-            font-size: 32px;
+            font-size: 30px;
             text-shadow: 0 0 10px #00d2ff;
         }
-        .unit { font-size: 14px; color: #8b949e; }
+        .unit { font-size: 12px; color: #8b949e; margin-right: 2px; }
+
         .progress-container {
-            width: 100%;
-            height: 8px;
+            width: 100%; height: 8px;
             background-color: #30363d;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            border-radius: 10px; margin-bottom: 20px;
             overflow: hidden;
         }
         #progress-bar {
@@ -93,12 +109,11 @@
         .button-group { display: flex; gap: 10px; }
         button {
             flex: 1; padding: 15px; border-radius: 10px; border: none;
-            font-weight: bold; cursor: pointer; transition: 0.3s;
+            font-weight: bold; cursor: pointer;
         }
         #startBtn { background: #238636; color: white; }
         #stopBtn { background: #d29922; color: white; }
         #resetBtn { background: #30363d; color: white; }
-        .complete-text { color: #00ff00; font-size: 24px; }
     </style>
 </head>
 <body>
@@ -108,9 +123,14 @@
         <div id="progress-bar"></div>
     </div>
 
-    <div class="dial-container" id="touch-area">
+    <div class="dial-outer" id="touch-area">
         <div id="watch-dial"></div>
-        <div class="picker-group" id="display-ui">
+        <div class="dial-label label-0">0</div>
+        <div class="dial-label label-15">15</div>
+        <div class="dial-label label-30">30</div>
+        <div class="dial-label label-45">45</div>
+        
+        <div class="picker-group" id="picker-ui">
             <div class="picker-column" id="h-col"></div><span class="unit">h</span>
             <div class="picker-column" id="m-col"></div><span class="unit">m</span>
             <div class="picker-column" id="s-col"></div><span class="unit">s</span>
@@ -140,21 +160,19 @@
             col.appendChild(div);
         }
         col.innerHTML += '<div class="picker-item"></div>';
-        col.onscroll = () => updateActive(col);
+        col.addEventListener('scroll', () => updateActive(col));
     };
 
     const updateActive = (col) => {
-        const items = col.getElementsByClassName('picker-item');
         const center = col.scrollTop + 60;
+        const items = col.getElementsByClassName('picker-item');
         Array.from(items).forEach(item => {
             const itemCenter = item.offsetTop + 20;
             item.classList.toggle('active', Math.abs(center - itemCenter) < 20);
         });
     };
 
-    createPicker(hCol, 23);
-    createPicker(mCol, 59);
-    createPicker(sCol, 59);
+    createPicker(hCol, 23); createPicker(mCol, 59); createPicker(sCol, 59);
 
     const getVal = (col) => {
         const active = col.querySelector('.active');
@@ -162,31 +180,40 @@
     };
 
     const setVal = (col, val) => {
-        col.scrollTo({ top: val * 40, behavior: 'smooth' });
+        col.scrollTo({ top: val * 40, behavior: 'auto' });
     };
 
-    let startAngle = 0;
-    let startVal = 0;
-    document.getElementById('touch-area').addEventListener('touchstart', (e) => {
-        const touch = e.touches[0];
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = touch.clientX - (rect.left + rect.width / 2);
-        const y = touch.clientY - (rect.top + rect.height / 2);
-        startAngle = Math.atan2(y, x);
-        startVal = getVal(mCol);
+    // 初期位置設定
+    setTimeout(() => { setVal(mCol, 3); }, 100);
+
+    // 外側の円をなぞる操作
+    let isDragging = false;
+    const touchArea = document.getElementById('touch-area');
+    const pickerUI = document.getElementById('picker-ui');
+
+    touchArea.addEventListener('touchstart', (e) => {
+        // ドラムロール部分を触っている時は「なぞる」を無効化
+        if (pickerUI.contains(e.target)) return;
+        isDragging = true;
+        handleCircleTouch(e.touches[0]);
     });
 
-    document.getElementById('touch-area').addEventListener('touchmove', (e) => {
-        if (timerId) return;
-        const touch = e.touches[0];
-        const rect = e.currentTarget.getBoundingClientRect();
+    touchArea.addEventListener('touchmove', (e) => {
+        if (!isDragging || timerId) return;
+        handleCircleTouch(e.touches[0]);
+    });
+
+    touchArea.addEventListener('touchend', () => isDragging = false);
+
+    function handleCircleTouch(touch) {
+        const rect = touchArea.getBoundingClientRect();
         const x = touch.clientX - (rect.left + rect.width / 2);
         const y = touch.clientY - (rect.top + rect.height / 2);
-        const currentAngle = Math.atan2(y, x);
-        let diff = Math.round((currentAngle - startAngle) * (60 / (Math.PI * 2)));
-        let newVal = (startVal + diff + 60) % 60;
-        setVal(mCol, newVal);
-    });
+        let angle = Math.atan2(y, x) * (180 / Math.PI);
+        angle = (angle + 450) % 360; // 0度を真上に調整
+        let minute = Math.floor(angle / 6); // 360度 / 60分 = 6度
+        setVal(mCol, minute);
+    }
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
@@ -196,7 +223,7 @@
         if (Notification.permission === "granted") {
             navigator.serviceWorker.ready.then(reg => {
                 reg.showNotification("MISSION COMPLETE", {
-                    body: "タイマー終了", icon: "icon.png", badge: "icon.png"
+                    body: "タイマーが終了しました", icon: "icon.png"
                 });
             });
         }
@@ -208,20 +235,19 @@
         let timeLeft = getVal(hCol) * 3600 + getVal(mCol) * 60 + getVal(sCol);
         if (timeLeft <= 0) return;
         totalTime = timeLeft;
-        hCol.style.pointerEvents = mCol.style.pointerEvents = sCol.style.pointerEvents = "none";
+        pickerUI.style.pointerEvents = "none";
         
         timerId = setInterval(() => {
             timeLeft--;
             setVal(hCol, Math.floor(timeLeft / 3600));
             setVal(mCol, Math.floor((timeLeft % 3600) / 60));
             setVal(sCol, timeLeft % 60);
-            const ratio = (timeLeft / totalTime) * 100;
-            document.getElementById('progress-bar').style.width = ratio + "%";
+            document.getElementById('progress-bar').style.width = (timeLeft / totalTime * 100) + "%";
             if (timeLeft <= 0) {
                 clearInterval(timerId);
                 timerId = null;
                 showNotification();
-                document.getElementById('display-ui').innerHTML = '<div class="complete-text">COMPLETE</div>';
+                alert("MISSION COMPLETE");
             }
         }, 1000);
     };
@@ -229,7 +255,7 @@
     document.getElementById('stopBtn').onclick = () => {
         clearInterval(timerId);
         timerId = null;
-        hCol.style.pointerEvents = mCol.style.pointerEvents = sCol.style.pointerEvents = "auto";
+        pickerUI.style.pointerEvents = "auto";
     };
 
     document.getElementById('resetBtn').onclick = () => location.reload();
