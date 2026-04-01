@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Advanced Mission Timer</title>
+    <title>Grand Mission Timer</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
     <style>
@@ -11,7 +11,7 @@
             --neon-blue: #00d2ff;
             --neon-red: #ff4757;
             --bg-dark: #0d1117;
-            --panel-bg: rgba(22, 27, 34, 0.8);
+            --panel-bg: rgba(22, 27, 34, 0.85);
         }
 
         body {
@@ -25,10 +25,9 @@
             margin: 0;
             color: white;
             overflow: hidden;
-            touch-action: none; /* 画面全体のスクロールを禁止 */
+            touch-action: none;
         }
 
-        /* 画面全体に広がる背景演出 */
         .scanline {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -47,12 +46,12 @@
             box-sizing: border-box;
         }
 
-        /* 外側の数字レイアウト */
+        /* 外側の数字レイアウト（サイズ調整） */
         .dial-outer {
             position: relative;
-            width: 320px;
-            height: 320px;
-            margin: 0 auto 40px;
+            width: 360px; /* ここを大きくしました */
+            height: 360px; /* ここを大きくしました */
+            margin: 0 auto 30px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -60,45 +59,46 @@
 
         #watch-dial {
             position: absolute;
-            width: 240px; /* 少し小さくして数字を外へ */
-            height: 240px;
+            width: 310px; /* 円を大きくしました */
+            height: 310px; /* 円を大きくしました */
             border-radius: 50%;
-            border: 4px solid #30363d;
-            box-shadow: 0 0 20px rgba(0, 210, 255, 0.2), inset 0 0 15px rgba(0, 0, 0, 0.5);
-            background: rgba(22, 27, 34, 0.5);
+            border: 6px solid #30363d; /* 枠線を少し太く */
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.6);
+            background: rgba(22, 27, 34, 0.6);
         }
 
-        /* 円の外側の数字 */
         .dial-label {
             position: absolute;
             color: var(--neon-blue);
-            font-size: 20px;
+            font-size: 22px; /* 数字を少し大きく */
             font-weight: bold;
-            text-shadow: 0 0 8px var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
+            z-index: 5;
         }
-        .label-0  { top: 0; }
-        .label-15 { right: 0; top: 50%; transform: translateY(-50%); }
-        .label-30 { bottom: 0; }
-        .label-45 { left: 0; top: 50%; transform: translateY(-50%); }
+        /* 数字の位置調整 */
+        .label-0  { top: -10px; }
+        .label-15 { right: -10px; top: 50%; transform: translateY(-50%); }
+        .label-30 { bottom: -10px; }
+        .label-45 { left: -10px; top: 50%; transform: translateY(-50%); }
 
         /* ドラムロールエリア */
         .picker-group {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             z-index: 10;
             background: var(--panel-bg);
-            padding: 15px;
-            border-radius: 20px;
+            padding: 20px;
+            border-radius: 25px;
             border: 1px solid #30363d;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(8px);
         }
 
         .picker-column {
             height: 120px;
             overflow-y: scroll;
-            width: 60px;
+            width: 70px;
             scrollbar-width: none;
             scroll-snap-type: y mandatory;
         }
@@ -107,7 +107,7 @@
         .picker-item {
             height: 40px;
             line-height: 40px;
-            font-size: 24px;
+            font-size: 26px;
             color: #484f58;
             scroll-snap-align: center;
             transition: color 0.2s;
@@ -115,48 +115,46 @@
         .picker-item.active {
             color: var(--neon-blue);
             font-weight: bold;
-            font-size: 32px;
+            font-size: 34px;
             text-shadow: 0 0 15px var(--neon-blue);
         }
 
-        .unit { font-size: 14px; color: #8b949e; margin-left: 2px; }
+        .unit { font-size: 16px; color: #8b949e; margin-left: 2px; }
 
-        /* プログレスバー（画面下部に配置） */
         .progress-fixed {
             position: fixed;
-            bottom: 0; left: 0; width: 100%; height: 10px;
+            bottom: 0; left: 0; width: 100%; height: 12px;
             background: #161b22;
         }
         #progress-bar {
             width: 100%; height: 100%;
             background: linear-gradient(90deg, #00d2ff, #00ff88);
-            box-shadow: 0 -2px 10px var(--neon-blue);
+            box-shadow: 0 -3px 15px var(--neon-blue);
             transition: width 1s linear;
         }
 
-        /* 操作ボタン */
         .button-group {
             display: flex;
             gap: 15px;
-            padding: 0 20px;
+            padding: 0 15px;
         }
         button {
             flex: 1;
-            padding: 18px;
-            border-radius: 12px;
+            padding: 20px;
+            border-radius: 15px;
             border: 1px solid #30363d;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
             transition: 0.2s;
             text-transform: uppercase;
             letter-spacing: 2px;
         }
-        #startBtn { background: #238636; color: white; border: none; box-shadow: 0 0 15px rgba(35, 134, 54, 0.4); }
+        #startBtn { background: #238636; color: white; border: none; box-shadow: 0 0 20px rgba(35, 134, 54, 0.5); }
         #stopBtn { background: #d29922; color: white; border: none; }
         #resetBtn { background: transparent; color: #8b949e; }
 
-        .complete-text { color: #00ff00; font-size: 28px; text-shadow: 0 0 20px #00ff00; }
+        .complete-text { color: #00ff00; font-size: 32px; text-shadow: 0 0 30px #00ff00; }
     </style>
 </head>
 <body>
