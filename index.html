@@ -31,11 +31,10 @@
             width: 100%;
         }
 
-        /* 外枠を広げて数字を円の完全に外側に配置 */
         .dial-outer {
             position: relative;
-            width: min(95vw, 440px); 
-            height: min(95vw, 440px);
+            width: min(92vw, 420px); 
+            height: min(92vw, 420px);
             margin-bottom: 20px;
             display: flex;
             justify-content: center;
@@ -44,7 +43,7 @@
 
         #watch-dial {
             position: absolute;
-            width: 70%; /* 円を少し小さくして、数字が被らないスペースを確保 */
+            width: 70%;
             height: 70%;
             border-radius: 50%;
             border: 4px solid var(--neon-blue);
@@ -55,19 +54,17 @@
         .dial-label {
             position: absolute;
             color: var(--neon-blue);
-            font-size: min(5.5vw, 24px);
+            font-size: min(5.5vw, 22px);
             font-weight: bold;
-            text-shadow: 0 0 12px var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
             z-index: 5;
         }
         
-        /* 円のラインに絶対に重ならないよう、位置を調整 */
-        .label-0  { top: 4%; }
-        .label-15 { right: 4%; top: 50%; transform: translateY(-50%); }
-        .label-30 { bottom: 4%; }
-        .label-45 { left: 4%; top: 50%; transform: translateY(-50%); }
+        .label-0  { top: 5%; }
+        .label-15 { right: 5%; top: 50%; transform: translateY(-50%); }
+        .label-30 { bottom: 5%; }
+        .label-45 { left: 5%; top: 50%; transform: translateY(-50%); }
 
-        /* 中央のパネルをスリム化 */
         .picker-group {
             display: flex;
             justify-content: center;
@@ -94,41 +91,70 @@
         .picker-item {
             height: 40px;
             line-height: 40px;
-            font-size: 20px;
+            font-size: 18px;
             color: #484f58;
             scroll-snap-align: center;
         }
         .picker-item.active {
             color: var(--neon-blue);
             font-weight: bold;
-            font-size: 26px;
+            font-size: 24px;
             text-shadow: 0 0 10px var(--neon-blue);
         }
 
         .button-group {
             display: flex;
-            gap: 12px;
-            width: 85%;
+            gap: 10px;
+            width: 80%;
         }
         button {
             flex: 1;
-            padding: 18px;
-            border-radius: 12px;
+            padding: 15px;
+            border-radius: 10px;
             border: 1px solid #30363d;
             font-weight: bold;
-            font-size: 16px;
             color: white;
             cursor: pointer;
             text-transform: uppercase;
         }
-        #startBtn { background: #238636; border: none; }
-        #stopBtn { background: #d29922; border: none; }
+        #startBtn { background: #238636; }
+        #stopBtn { background: #d29922; }
         #resetBtn { background: transparent; color: #8b949e; }
+
+        #custom-alert {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--panel-bg);
+            border: 2px solid var(--neon-blue);
+            padding: 30px;
+            border-radius: 15px;
+            z-index: 1000;
+            text-align: center;
+            box-shadow: 0 0 30px var(--neon-blue);
+            backdrop-filter: blur(10px);
+        }
+        #custom-alert h2 { margin: 0 0 20px 0; color: var(--neon-blue); font-size: 24px; }
+        #close-alert {
+            background: var(--neon-blue);
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-<audio id="alarm-audio" src="alarm.mp3" preload="auto"></audio>
+<audio id="alarm-audio" src="alarm.mp3" preload="auto" loop></audio>
+
+<div id="custom-alert">
+    <h2>MISSION COMPLETE</h2>
+    <button id="close-alert">STOP ALARM</button>
+</div>
 
 <div class="timer-container">
     <div class="dial-outer" id="touch-area">
@@ -158,6 +184,35 @@
     const pickerUI = document.getElementById('picker-ui');
     const touchArea = document.getElementById('touch-area');
     const alarmAudio = document.getElementById('alarm-audio');
+    const customAlert = document.getElementById('custom-alert');
+
+    // ロック画面のメディア操作を設定
+    function setupMediaSession() {
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: 'Grand Mission Timer',
+                artist: 'Mission Accomplished',
+                album: 'Timer Alarm'
+            });
+
+            // ロック画面の「停止/再生」ボタンが押された時の処理
+            navigator.mediaSession.setActionHandler('pause', stopEverything);
+            navigator.mediaSession.setActionHandler('stop', stopEverything);
+        }
+    }
+
+    function stopEverything() {
+        if (timerId) {
+            clearInterval(timerId);
+            timerId = null;
+        }
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
+        customAlert.style.display = "none";
+        pickerUI.style.pointerEvents = "auto";
+        // 画面をリセット
+        location.reload();
+    }
 
     const createPicker = (col, max) => {
         col.innerHTML = '<div class="picker-item"></div>'; 
@@ -192,11 +247,7 @@
     touchArea.addEventListener('touchstart', (e) => {
         if (pickerUI.contains(e.target)) return;
         const rect = touchArea.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        
-        // 触り始めた瞬間の左右で「分」か「秒」かを決定
-        currentMode = (e.touches[0].clientX > centerX) ? 's' : 'm';
-        
+        currentMode = (e.touches[0].clientX > rect.left + rect.width / 2) ? 's' : 'm';
         isDragging = true;
         handleTouch(e.touches[0]);
     });
@@ -212,16 +263,13 @@
         const rect = touchArea.getBoundingClientRect();
         const x = touch.clientX - (rect.left + rect.width / 2);
         const y = touch.clientY - (rect.top + rect.height / 2);
-        
-        // 全周360度（0-59）を計算
         let angle = (Math.atan2(y, x) * (180 / Math.PI) + 450) % 360; 
-        const value = Math.floor(angle / 6);
-
-        setVal(currentMode === 's' ? sCol : mCol, value);
+        setVal(currentMode === 's' ? sCol : mCol, Math.floor(angle / 6));
     }
 
     document.getElementById('startBtn').onclick = () => {
-        // iOS/スマホの音源ロックを解除する儀式
+        setupMediaSession();
+        // ダミー再生でブラウザの制限を解除
         alarmAudio.play().then(() => {
             alarmAudio.pause();
             alarmAudio.currentTime = 0;
@@ -243,22 +291,14 @@
             setVal(sCol, timeLeft % 60);
             if (timeLeft <= 0) {
                 clearInterval(timerId); timerId = null;
-                // 音楽を再生
                 alarmAudio.play();
-                setTimeout(() => {
-                    alert("MISSION COMPLETE");
-                    location.reload();
-                }, 500);
+                customAlert.style.display = "block";
             }
         }, 1000);
     };
 
-    document.getElementById('stopBtn').onclick = () => {
-        clearInterval(timerId); timerId = null;
-        alarmAudio.pause();
-        alarmAudio.currentTime = 0;
-        pickerUI.style.pointerEvents = "auto";
-    };
+    document.getElementById('close-alert').onclick = stopEverything;
+    document.getElementById('stopBtn').onclick = stopEverything;
     document.getElementById('resetBtn').onclick = () => location.reload();
 </script>
 </body>
