@@ -113,22 +113,23 @@
     function abortTimer() {
         clearInterval(timerId); timerId = null;
         alarmAudio.pause();
-        alarmAudio.volume = 0;
+        alarmAudio.currentTime = 0;
         pickerUI.style.pointerEvents = 'auto';
     }
 
     document.getElementById('startBtn').onclick = () => {
         if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
 
+        // 【改善点】開始の瞬間に「音量ほぼゼロ」で再生を開始し、OSの許可を奪取
+        alarmAudio.volume = 0.01; 
+        alarmAudio.play().then(() => {
+            // 一瞬再生してすぐ一時停止させるのではなく、再生させたままで音量を「極限の無音」にする
+            // これで Dynamic Island にも波形が出るはずです
+            alarmAudio.volume = 0; 
+        }).catch(e => console.log("Unlock error", e));
+
         const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
         endTime = Date.now() + totalMs;
-
-        // 【ここが重要】開始時に音量0で再生を開始しておく
-        alarmAudio.volume = 0;
-        alarmAudio.play().then(() => {
-            console.log("Audio session unlocked");
-        }).catch(e => console.log("Unlock failed", e));
-
         pickerUI.style.pointerEvents = 'none';
 
         timerId = setInterval(() => {
@@ -139,14 +140,14 @@
             if (diff <= 0) {
                 clearInterval(timerId);
                 timerId = null;
-                // 0になったら音量を1にする
-                alarmAudio.volume = 1.0; 
+                // 終了した瞬間に音量を 1 に引き上げる
+                alarmAudio.volume = 1.0;
                 document.getElementById('in-app-notif').style.display = 'block';
             }
         }, 1000);
 
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({ title: 'MISSION ACTIVE', artist: 'Timer' });
+            navigator.mediaSession.metadata = new MediaMetadata({ title: 'TIMER ACTIVE' });
             navigator.mediaSession.setActionHandler('pause', abortTimer);
         }
     };
