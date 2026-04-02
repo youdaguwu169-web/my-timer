@@ -72,26 +72,29 @@
 </div>
 
 <script>
-    let worker = null;
+    let timerId = null;
     let endTime = null;
+    let keepAliveOsc = null;
+    let audioCtx = null;
     const alarmAudio = document.getElementById('alarm-audio');
     const pickerUI = document.getElementById('picker-ui');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
     let state = { h: 0, m: 0, s: 0 };
 
-    // Web Workerの設定 (バックグラウンドで止まらないタイマー)
-    const workerCode = `
-        let timer = null;
-        self.onmessage = function(e) {
-            if (e.data === 'start') {
-                timer = setInterval(() => self.postMessage('tick'), 1000);
-            } else if (e.data === 'stop') {
-                clearInterval(timer);
-            }
-        };
-    `;
-    const blob = new Blob([workerCode], { type: 'application/javascript' });
-    worker = new Worker(URL.createObjectURL(blob));
+    // 【新機能】人間には聞こえない20Hzの音を鳴らしてプロセスを維持する
+    function startKeepAlive() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        keepAliveOsc = audioCtx.createOscillator();
+        const lowGain = audioCtx.createGain();
+        keepAliveOsc.type = 'sine';
+        keepAliveOsc.frequency.setValueAtTime(20, audioCtx.currentTime); // 20Hz（ほぼ無音）
+        lowGain.gain.setValueAtTime(0.01, audioCtx.currentTime); 
+        keepAliveOsc.connect(lowGain);
+        lowGain.connect(audioCtx.destination);
+        keepAliveOsc.start();
+    }
 
     const createPicker = (col, max, key) => {
         col.innerHTML = '<div class="picker-item"></div>';
@@ -125,44 +128,46 @@
     function resetTimer() { location.reload(); }
     
     function abortTimer() {
-        worker.postMessage('stop');
+        clearInterval(timerId); timerId = null;
+        if (keepAliveOsc) { keepAliveOsc.stop(); keepAliveOsc = null; }
         alarmAudio.pause();
         alarmAudio.currentTime = 0;
         pickerUI.style.pointerEvents = 'auto';
     }
 
-    worker.onmessage = function() {
-        const now = Date.now();
-        const diff = Math.max(0, Math.ceil((endTime - now) / 1000));
-        
-        updateDisplay(Math.floor(diff/3600), Math.floor((diff%3600)/60), diff%60);
-
-        if (diff <= 0) {
-            worker.postMessage('stop');
-            alarmAudio.volume = 1.0;
-            alarmAudio.play();
-            document.getElementById('in-app-notif').style.display = 'block';
-        }
-    };
-
     document.getElementById('startBtn').onclick = () => {
-        if (endTime && endTime > Date.now()) return;
+        if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
 
-        // 【音対策】開始時に一瞬だけ再生してOSに許可を取る
-        alarmAudio.volume = 0;
+        // 【改善】超低周波音を開始
+        startKeepAlive();
+        
+        // 【改善】アラーム音を一度「再生→停止」して権限を確保
         alarmAudio.play().then(() => {
-            alarmAudio.pause(); // 許可だけ取ってすぐ止める（音漏れ防止）
+            alarmAudio.pause();
             alarmAudio.currentTime = 0;
         });
 
         const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
         endTime = Date.now() + totalMs;
         pickerUI.style.pointerEvents = 'none';
-        
-        worker.postMessage('start');
+
+        timerId = setInterval(() => {
+            const now = Date.now();
+            const diff = Math.max(0, Math.ceil((endTime - now) / 1000));
+            updateDisplay(Math.floor(diff/3600), Math.floor((diff%3600)/60), diff%60);
+
+            if (diff <= 0) {
+                clearInterval(timerId);
+                timerId = null;
+                if (keepAliveOsc) { keepAliveOsc.stop(); keepAliveOsc = null; }
+                alarmAudio.play(); // ここで確実に鳴らす
+                document.getElementById('in-app-notif').style.display = 'block';
+            }
+        }, 1000);
 
         if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = new MediaMetadata({ title: 'MISSION IN PROGRESS' });
+            navigator.mediaSession.setActionHandler('pause', abortTimer);
         }
     };
 
@@ -171,7 +176,7 @@
 
     const touchArea = document.getElementById('touch-area');
     touchArea.addEventListener('touchstart', (e) => {
-        if (endTime && endTime > Date.now() || pickerUI.contains(e.target)) return;
+        if (timerId || pickerUI.contains(e.target)) return;
         const rect = touchArea.getBoundingClientRect();
         const isRight = e.touches[0].clientX > rect.left + rect.width / 2;
         const targetCol = isRight ? cols.s : cols.m;
