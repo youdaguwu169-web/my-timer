@@ -72,12 +72,26 @@
 </div>
 
 <script>
-    let timerId = null;
+    let worker = null;
     let endTime = null;
     const alarmAudio = document.getElementById('alarm-audio');
     const pickerUI = document.getElementById('picker-ui');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
     let state = { h: 0, m: 0, s: 0 };
+
+    // Web Workerの設定 (バックグラウンドで止まらないタイマー)
+    const workerCode = `
+        let timer = null;
+        self.onmessage = function(e) {
+            if (e.data === 'start') {
+                timer = setInterval(() => self.postMessage('tick'), 1000);
+            } else if (e.data === 'stop') {
+                clearInterval(timer);
+            }
+        };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    worker = new Worker(URL.createObjectURL(blob));
 
     const createPicker = (col, max, key) => {
         col.innerHTML = '<div class="picker-item"></div>';
@@ -111,49 +125,44 @@
     function resetTimer() { location.reload(); }
     
     function abortTimer() {
-        clearInterval(timerId); timerId = null;
+        worker.postMessage('stop');
         alarmAudio.pause();
         alarmAudio.currentTime = 0;
         pickerUI.style.pointerEvents = 'auto';
     }
 
-    document.getElementById('startBtn').onclick = () => {
-        if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
-
-        // 【修正点】再生する「前」に音量を0にする
-        alarmAudio.pause();
-        alarmAudio.volume = 0;
-        alarmAudio.currentTime = 0;
+    worker.onmessage = function() {
+        const now = Date.now();
+        const diff = Math.max(0, Math.ceil((endTime - now) / 1000));
         
-        // 再生を開始。iPhoneに「このサイトは今再生中である」という許可だけ取らせる
-        const playPromise = alarmAudio.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(e => console.log("Audio unlock failed:", e));
+        updateDisplay(Math.floor(diff/3600), Math.floor((diff%3600)/60), diff%60);
+
+        if (diff <= 0) {
+            worker.postMessage('stop');
+            alarmAudio.volume = 1.0;
+            alarmAudio.play();
+            document.getElementById('in-app-notif').style.display = 'block';
         }
+    };
+
+    document.getElementById('startBtn').onclick = () => {
+        if (endTime && endTime > Date.now()) return;
+
+        // 【音対策】開始時に一瞬だけ再生してOSに許可を取る
+        alarmAudio.volume = 0;
+        alarmAudio.play().then(() => {
+            alarmAudio.pause(); // 許可だけ取ってすぐ止める（音漏れ防止）
+            alarmAudio.currentTime = 0;
+        });
 
         const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
         endTime = Date.now() + totalMs;
         pickerUI.style.pointerEvents = 'none';
-
-        timerId = setInterval(() => {
-            const now = Date.now();
-            const diff = Math.max(0, Math.ceil((endTime - now) / 1000));
-            
-            // 残り時間を表示
-            updateDisplay(Math.floor(diff/3600), Math.floor((diff%3600)/60), diff%60);
-
-            if (diff <= 0) {
-                clearInterval(timerId);
-                timerId = null;
-                // 0秒になった瞬間にだけ音量を上げる
-                alarmAudio.volume = 1.0; 
-                document.getElementById('in-app-notif').style.display = 'block';
-            }
-        }, 1000);
+        
+        worker.postMessage('start');
 
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({ title: 'TIMER RUNNING' });
-            navigator.mediaSession.setActionHandler('pause', abortTimer);
+            navigator.mediaSession.metadata = new MediaMetadata({ title: 'MISSION IN PROGRESS' });
         }
     };
 
@@ -162,7 +171,7 @@
 
     const touchArea = document.getElementById('touch-area');
     touchArea.addEventListener('touchstart', (e) => {
-        if (timerId || pickerUI.contains(e.target)) return;
+        if (endTime && endTime > Date.now() || pickerUI.contains(e.target)) return;
         const rect = touchArea.getBoundingClientRect();
         const isRight = e.touches[0].clientX > rect.left + rect.width / 2;
         const targetCol = isRight ? cols.s : cols.m;
