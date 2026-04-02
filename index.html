@@ -52,7 +52,7 @@
 
 <div id="in-app-notif">
     <h2 style="margin:0; color:var(--neon-blue);">MISSION COMPLETE</h2>
-    <button onclick="resetTimer()" style="margin-top:15px; width:100%; background:var(--neon-blue); color:black; padding:12px; border-radius:8px; border:none; font-weight:bold;">STOP ALARM</button>
+    <button onclick="resetTimer()" style="margin-top:15px; width:100%; background:var(--neon-blue); color:black; padding:12px; border-radius:8px; border:none; font-weight:bold;">STOP ALARM & NOTIFICATION</button>
 </div>
 
 <div class="timer-container">
@@ -74,32 +74,24 @@
 <script>
     let timerId = null;
     let endTime = null;
-    let audioCtx = null;
-    let silenceOsc = null;
+    let notifyInterval = null;
     const alarmAudio = document.getElementById('alarm-audio');
     const pickerUI = document.getElementById('picker-ui');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
     let state = { h: 0, m: 0, s: 0 };
 
-    // 通知の許可設定
     async function requestNotificationPermission() {
-        if ("Notification" in window) {
-            const permission = await Notification.requestPermission();
-            console.log("Notification status:", permission);
-        }
+        if ("Notification" in window) await Notification.requestPermission();
     }
 
-    // ブラウザを眠らせないための無音再生
-    function startSilence() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        silenceOsc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        silenceOsc.frequency.setValueAtTime(1, audioCtx.currentTime); // 人間には聞こえない周波数
-        gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
-        silenceOsc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        silenceOsc.start();
+    function sendContinuousNotification() {
+        if (Notification.permission === "granted") {
+            new Notification("MISSION COMPLETE", {
+                body: "タイマー終了！止めるまで通知を送り続けます。",
+                tag: "alarm-active",
+                renotify: true
+            });
+        }
     }
 
     const createPicker = (col, max, key) => {
@@ -133,29 +125,23 @@
 
     function resetTimer() { location.reload(); }
     
-    function abortTimer() {
-        clearInterval(timerId); timerId = null;
-        if (silenceOsc) { silenceOsc.stop(); silenceOsc = null; }
-        alarmAudio.pause(); alarmAudio.currentTime = 0;
+    function stopAll() {
+        clearInterval(timerId);
+        clearInterval(notifyInterval);
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
+        timerId = null;
         pickerUI.style.pointerEvents = 'auto';
     }
 
     document.getElementById('startBtn').onclick = async () => {
         if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
-
-        // 【重要】開始時に通知の許可を求める
         await requestNotificationPermission();
 
-        // 【重要】ブラウザの休止を防ぐ無音開始
-        startSilence();
-
-        // アラーム音の再生権限を一瞬で確保（音漏れ防止のため即停止）
+        // 【ここが最大のポイント】
+        // 開始時に「無音」で再生を開始。これでOSに「このアプリは再生中」と認識させる。
         alarmAudio.volume = 0;
-        alarmAudio.play().then(() => {
-            alarmAudio.pause();
-            alarmAudio.currentTime = 0;
-            alarmAudio.volume = 1.0;
-        });
+        alarmAudio.play().catch(e => console.log("Play failed", e));
 
         const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
         endTime = Date.now() + totalMs;
@@ -169,25 +155,26 @@
             if (diff <= 0) {
                 clearInterval(timerId);
                 timerId = null;
-                if (silenceOsc) { silenceOsc.stop(); silenceOsc = null; }
                 
-                // 1. 音を鳴らす
-                alarmAudio.play();
-
-                // 2. 他のアプリを開いていても通知を出す
-                if (Notification.permission === "granted") {
-                    new Notification("Grand Mission", {
-                        body: "MISSION COMPLETE! タイマーが終了しました。",
-                        icon: "icon.png" // 任意
-                    });
-                }
+                // 【終了時】音量を1に戻す（すでに再生中なのでブロックされない）
+                alarmAudio.volume = 1.0;
+                
+                // 通知を5秒おきに送り続ける（止めるまで）
+                notifyInterval = setInterval(sendContinuousNotification, 5000);
+                sendContinuousNotification();
                 
                 document.getElementById('in-app-notif').style.display = 'block';
             }
         }, 1000);
+
+        // ロック画面に情報を出すための処理
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({ title: 'MISSION ACTIVE', artist: 'Timer' });
+            navigator.mediaSession.setActionHandler('pause', stopAll);
+        }
     };
 
-    document.getElementById('stopBtn').onclick = abortTimer;
+    document.getElementById('stopBtn').onclick = stopAll;
     document.getElementById('resetBtn').onclick = resetTimer;
 
     const touchArea = document.getElementById('touch-area');
