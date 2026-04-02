@@ -80,14 +80,14 @@
 
 <script>
     let timerId = null;
-    let endTime = null; // 終了予定時刻を保持
+    let endTime = null;
     const alarmAudio = document.getElementById('alarm-audio');
     const silentAudio = document.getElementById('silent-audio');
     const pickerUI = document.getElementById('picker-ui');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
     let state = { h: 0, m: 0, s: 0 };
 
-    // 無音データの作成（iPhoneのバックグラウンド維持用）
+    // 無音音源（これがないとバックグラウンドで止まります）
     silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA== ";
 
     const createPicker = (col, max, key) => {
@@ -120,6 +120,7 @@
     };
 
     function resetTimer() { location.reload(); }
+    
     function abortTimer() {
         clearInterval(timerId); timerId = null;
         alarmAudio.pause(); silentAudio.pause();
@@ -129,14 +130,20 @@
     document.getElementById('startBtn').onclick = () => {
         if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
 
-        // 終了時刻を確定させる
+        // 【バックグラウンド対応】終了予定時刻を絶対時刻で固定
         const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
         endTime = Date.now() + totalMs;
 
-        // バックグラウンド維持開始
-        silentAudio.play();
+        // 【バックグラウンド対応】無音を流してプロセスを維持
+        silentAudio.play().catch(e => console.log("Silent Play Error:", e));
+        
+        // アラームの再生許可（一瞬鳴らして止める）
         alarmAudio.muted = true;
-        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; alarmAudio.muted = false; });
+        alarmAudio.play().then(() => {
+            alarmAudio.pause();
+            alarmAudio.currentTime = 0;
+            alarmAudio.muted = false;
+        });
 
         pickerUI.style.pointerEvents = 'none';
 
@@ -150,17 +157,27 @@
 
             updateDisplay(h, m, s);
 
+            // 0秒になった時
             if (diff <= 0) {
                 clearInterval(timerId);
                 timerId = null;
                 silentAudio.pause();
                 alarmAudio.play();
                 document.getElementById('in-app-notif').style.display = 'block';
+                
+                // ロック画面に通知
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.playbackState = 'playing';
+                }
             }
         }, 1000);
 
+        // ロック画面への情報送信
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({ title: 'TIMER RUNNING' });
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: 'Timer Active',
+                artist: 'Grand Mission'
+            });
             navigator.mediaSession.setActionHandler('pause', resetTimer);
         }
     };
