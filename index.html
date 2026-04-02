@@ -48,7 +48,7 @@
             border-radius: 50%;
             border: 4px solid var(--neon-blue);
             box-shadow: 0 0 20px var(--neon-blue), inset 0 0 15px var(--neon-blue);
-            pointer-events: none; /* ダイヤル自体は触らせない */
+            pointer-events: none;
         }
 
         .dial-label {
@@ -71,7 +71,7 @@
             justify-content: center;
             align-items: center;
             gap: 5px;
-            z-index: 20; /* ドラッグエリアより上に配置 */
+            z-index: 20;
             background: var(--panel-bg);
             padding: 12px;
             border-radius: 20px;
@@ -188,11 +188,7 @@
             const center = col.scrollTop + 40;
             Array.from(col.children).forEach(item => {
                 const itemCenter = item.offsetTop + 20;
-                if (Math.abs(center - itemCenter) < 20) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
-                }
+                item.classList.toggle('active', Math.abs(center - itemCenter) < 20);
             });
         };
     };
@@ -219,7 +215,7 @@
     document.getElementById('startBtn').onclick = () => {
         if (timerId) return;
 
-        // ピッカーから最新の時間を取得（中断中ならそれを使う）
+        // 時間の取得
         if (remainSeconds <= 0) {
             const getVal = (col) => {
                 const items = Array.from(col.children);
@@ -231,29 +227,33 @@
         
         if (remainSeconds <= 0) return;
 
-        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; });
+        // 【修正】iPhoneの音声再生許可のみを行い、音量は0にする（鳴り始め防止）
+        alarmAudio.volume = 0;
+        alarmAudio.play().then(() => {
+            alarmAudio.pause();
+            alarmAudio.currentTime = 0;
+            alarmAudio.volume = 1.0; // 準備完了。後で鳴らす時は最大音量
+        });
+
         pickerUI.style.pointerEvents = 'none';
 
-        // 開始直後に表示を一度更新（1分減るバグ回避）
-        updateDisplay(remainSeconds);
-
+        // カウントダウン処理
         timerId = setInterval(() => {
-            remainSeconds--;
+            // 【重要】先に表示を更新してから減らすことで、開始時のズレを防止
             updateDisplay(remainSeconds);
-
+            
             if (remainSeconds <= 0) {
                 clearInterval(timerId);
                 timerId = null;
                 alarmAudio.play();
                 document.getElementById('in-app-notif').style.display = 'block';
-                if (Notification.permission === 'granted') {
-                    new Notification('Grand Mission Timer', { body: 'MISSION COMPLETE' });
-                }
+            } else {
+                remainSeconds--;
             }
         }, 1000);
 
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({ title: 'Grand Mission Timer', artist: 'Active' });
+            navigator.mediaSession.metadata = new MediaMetadata({ title: 'Grand Mission Timer', artist: 'In Progress' });
             navigator.mediaSession.setActionHandler('pause', resetTimer);
         }
     };
@@ -261,21 +261,21 @@
     document.getElementById('stopBtn').onclick = abortTimer;
     document.getElementById('resetBtn').onclick = resetTimer;
 
-    // タッチ操作の干渉回避
+    // タッチ操作の改良（干渉防止）
     const touchArea = document.getElementById('touch-area');
     touchArea.addEventListener('touchstart', (e) => {
-        if (timerId || pickerUI.contains(e.target)) return; // ピッカーを触っている時はドラッグを無視
+        if (timerId || pickerUI.contains(e.target)) return;
         
         const rect = touchArea.getBoundingClientRect();
+        // 左右で分・秒を選択
         const mode = (e.touches[0].clientX > rect.left + rect.width / 2) ? cols.s : cols.m;
         
         const handle = (t) => {
             const x = t.clientX - (rect.left + rect.width / 2);
             const y = t.clientY - (rect.top + rect.height / 2);
             let angle = (Math.atan2(y, x) * (180 / Math.PI) + 450) % 360;
-            const val = Math.floor(angle / 6);
-            mode.scrollTo({ top: val * 40, behavior: 'auto' });
-            remainSeconds = 0; // 手動操作したらカウントをクリア
+            mode.scrollTo({ top: Math.floor(angle / 6) * 40, behavior: 'auto' });
+            remainSeconds = 0; // 手動設定したら残り時間データをリセット
         };
 
         handle(e.touches[0]);
@@ -284,7 +284,7 @@
         window.addEventListener('touchend', () => window.removeEventListener('touchmove', move), {once:true});
     });
 
-    // 初期表示
+    // 初期化（3分）
     setTimeout(() => { updateDisplay(180, 'auto'); }, 200);
 </script>
 </body>
