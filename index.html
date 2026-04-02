@@ -119,11 +119,10 @@
         #stopBtn { background: #d29922; }
         #resetBtn { background: #30363d; color: #8b949e; }
 
-        /* ゲーム内風ポップアップ（アプリを開いている時用） */
         #in-app-notif {
             display: none;
             position: fixed;
-            top: 20px;
+            top: env(safe-area-inset-top, 20px);
             left: 50%;
             transform: translateX(-50%);
             width: 90%;
@@ -135,7 +134,9 @@
             z-index: 2000;
             box-shadow: 0 0 20px var(--neon-blue);
             text-align: center;
+            animation: slideIn 0.3s ease-out;
         }
+        @keyframes slideIn { from { top: -100px; } to { top: 20px; } }
     </style>
 </head>
 <body>
@@ -144,7 +145,7 @@
 
 <div id="in-app-notif">
     <h3 style="margin:0; color:var(--neon-blue)">MISSION COMPLETE</h3>
-    <button onclick="stopEverything()" style="margin-top:10px; padding:5px 20px; background:var(--neon-blue); color:black; border-radius:5px; border:none; font-weight:bold;">DISMISS</button>
+    <button onclick="resetTimer()" style="margin-top:10px; padding:5px 20px; background:var(--neon-blue); color:black; border-radius:5px; border:none; font-weight:bold;">DISMISS</button>
 </div>
 
 <div class="timer-container">
@@ -169,14 +170,9 @@
 
 <script>
     let timerId = null;
-    let endTime = null;
+    let remainSeconds = 0;
     const alarmAudio = document.getElementById('alarm-audio');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
-
-    // Service Workerの登録（通知用）
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
-    }
 
     const createPicker = (col, max) => {
         col.innerHTML = '<div class="picker-item"></div>'; 
@@ -197,62 +193,65 @@
 
     createPicker(cols.h, 23); createPicker(cols.m, 59); createPicker(cols.s, 59);
 
-    function stopEverything() {
-        clearInterval(timerId); timerId = null;
-        alarmAudio.pause(); alarmAudio.currentTime = 0;
-        document.getElementById('in-app-notif').style.display = 'none';
+    const updateDisplay = (total) => {
+        cols.h.scrollTo({ top: Math.floor(total / 3600) * 40, behavior: 'smooth' });
+        cols.m.scrollTo({ top: Math.floor((total % 3600) / 60) * 40, behavior: 'smooth' });
+        cols.s.scrollTo({ top: (total % 60) * 40, behavior: 'smooth' });
+    };
+
+    // ABORT（中断）: その場で止める。リロードしない。
+    function abortTimer() {
+        clearInterval(timerId);
+        timerId = null;
+        alarmAudio.pause();
         document.getElementById('picker-ui').style.pointerEvents = 'auto';
+    }
+
+    // RESET（初期化）: ページをリロードして最初に戻す。
+    function resetTimer() {
         location.reload();
     }
 
-    document.getElementById('startBtn').onclick = async () => {
-        // 通知許可の要求
-        if (Notification.permission !== 'granted') {
-            await Notification.requestPermission();
+    document.getElementById('startBtn').onclick = () => {
+        if (timerId) return;
+
+        // まだ開始していない（中断中ではない）場合のみピッカーから時間を取得
+        if (remainSeconds <= 0) {
+            const getVal = (col) => parseInt(col.querySelector('.active')?.textContent || 0);
+            remainSeconds = getVal(cols.h) * 3600 + getVal(cols.m) * 60 + getVal(cols.s);
         }
-
-        const getVal = (col) => parseInt(col.querySelector('.active')?.textContent || 0);
-        let totalSeconds = getVal(cols.h) * 3600 + getVal(cols.m) * 60 + getVal(cols.s);
-        if (totalSeconds <= 0 || timerId) return;
-
-        // 音声ロック解除
-        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; });
         
+        if (remainSeconds <= 0) return;
+
+        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; });
         document.getElementById('picker-ui').style.pointerEvents = 'none';
-        endTime = Date.now() + totalSeconds * 1000;
 
         timerId = setInterval(() => {
-            const now = Date.now();
-            let remain = Math.round((endTime - now) / 1000);
+            remainSeconds--;
+            updateDisplay(remainSeconds);
 
-            if (remain <= 0) {
+            if (remainSeconds <= 0) {
                 clearInterval(timerId);
+                timerId = null;
                 alarmAudio.play();
                 document.getElementById('in-app-notif').style.display = 'block';
-                // OS標準通知（ホーム画面用）
+                // iOS通知の呼び出し
                 if (Notification.permission === 'granted') {
-                    new Notification('Grand Mission Timer', { body: 'MISSION COMPLETE', icon: 'icon.png' });
+                    new Notification('Grand Mission Timer', { body: 'MISSION COMPLETE' });
                 }
-                return;
             }
-
-            // 表示の更新（スクロールを直接指定して「飛び」を防ぐ）
-            cols.h.scrollTo({ top: Math.floor(remain / 3600) * 40, behavior: 'smooth' });
-            cols.m.scrollTo({ top: Math.floor((remain % 3600) / 60) * 40, behavior: 'smooth' });
-            cols.s.scrollTo({ top: (remain % 60) * 40, behavior: 'smooth' });
         }, 1000);
 
-        // ロック画面操作設定
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({ title: 'Grand Mission Timer', artist: 'Active' });
-            navigator.mediaSession.setActionHandler('pause', stopEverything);
+            navigator.mediaSession.metadata = new MediaMetadata({ title: 'Grand Mission Timer', artist: 'Running' });
+            navigator.mediaSession.setActionHandler('pause', abortTimer);
         }
     };
 
-    document.getElementById('stopBtn').onclick = stopEverything;
-    document.getElementById('resetBtn').onclick = () => location.reload();
+    document.getElementById('stopBtn').onclick = abortTimer;
+    document.getElementById('resetBtn').onclick = resetTimer;
 
-    // タッチ操作ロジック（左右で分・秒切り替え）
+    // タッチ操作
     const touchArea = document.getElementById('touch-area');
     touchArea.addEventListener('touchstart', (e) => {
         if (timerId) return;
@@ -263,12 +262,16 @@
             const y = t.clientY - (rect.top + rect.height / 2);
             let angle = (Math.atan2(y, x) * (180 / Math.PI) + 450) % 360;
             mode.scrollTo({ top: Math.floor(angle / 6) * 40, behavior: 'auto' });
+            remainSeconds = 0; // 手動で動かしたら中断データをクリア
         };
         handle(e.touches[0]);
         const move = (me) => handle(me.touches[0]);
         window.addEventListener('touchmove', move);
         window.addEventListener('touchend', () => window.removeEventListener('touchmove', move), {once:true});
     });
+
+    // 初期化（3分にセット）
+    setTimeout(() => { updateDisplay(180); }, 200);
 </script>
 </body>
 </html>
