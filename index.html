@@ -7,165 +7,68 @@
     <style>
         :root {
             --neon-blue: #00d2ff;
-            --bg-dark: #0d1117;
             --panel-bg: rgba(22, 27, 34, 0.9);
         }
-
         body {
             font-family: 'Courier New', sans-serif;
             background: radial-gradient(circle at center, #1a1f25 0%, #0d1117 100%) fixed;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            color: white;
-            overflow: hidden;
-            touch-action: none;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; margin: 0; color: white; overflow: hidden; touch-action: none;
         }
-
-        .timer-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-        }
-
+        .timer-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
         .dial-outer {
-            position: relative;
-            width: min(92vw, 420px); 
-            height: min(92vw, 420px);
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: relative; width: min(92vw, 420px); height: min(92vw, 420px);
+            margin-bottom: 20px; display: flex; justify-content: center; align-items: center;
         }
-
         #watch-dial {
-            position: absolute;
-            width: 75%;
-            height: 75%;
-            border-radius: 50%;
-            border: 4px solid var(--neon-blue);
-            box-shadow: 0 0 20px var(--neon-blue), inset 0 0 15px var(--neon-blue);
+            position: absolute; width: 75%; height: 75%; border-radius: 50%;
+            border: 4px solid var(--neon-blue); box-shadow: 0 0 20px var(--neon-blue), inset 0 0 15px var(--neon-blue);
             pointer-events: none;
         }
-
-        /* 単位ラベル */
-        .unit-label {
-            position: absolute;
-            font-size: 10px;
-            color: #484f58;
-            top: -15px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
         .picker-group {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            z-index: 30;
-            background: var(--panel-bg);
-            padding: 15px;
-            border-radius: 20px;
-            border: 1px solid #30363d;
-            backdrop-filter: blur(15px);
+            display: flex; gap: 10px; z-index: 30; background: var(--panel-bg);
+            padding: 15px; border-radius: 20px; border: 1px solid #30363d; backdrop-filter: blur(15px);
         }
-
-        .picker-column-wrapper {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
         .picker-column {
-            height: 120px; /* 3つ分見える高さ */
-            overflow-y: scroll;
-            width: 45px;
-            scrollbar-width: none;
-            scroll-snap-type: y mandatory;
+            height: 120px; overflow-y: scroll; width: 45px;
+            scrollbar-width: none; scroll-snap-type: y mandatory;
         }
         .picker-column::-webkit-scrollbar { display: none; }
-        
         .picker-item {
-            height: 40px;
-            line-height: 40px;
-            font-size: 20px;
-            color: #484f58;
-            text-align: center;
-            scroll-snap-align: center;
-            transition: color 0.2s, text-shadow 0.2s;
+            height: 40px; line-height: 40px; font-size: 20px; color: #484f58;
+            text-align: center; scroll-snap-align: center;
         }
-        .picker-item.active {
-            color: var(--neon-blue);
-            font-weight: bold;
-            font-size: 26px;
-            text-shadow: 0 0 10px var(--neon-blue);
-        }
-
-        .button-group {
-            display: flex;
-            gap: 15px;
-            width: 85%;
-        }
-        button {
-            flex: 1;
-            padding: 18px;
-            border-radius: 12px;
-            border: none;
-            font-weight: bold;
-            color: white;
-            letter-spacing: 1px;
-        }
-        #startBtn { background: #238636; box-shadow: 0 0 10px rgba(35, 134, 54, 0.4); }
+        .picker-item.active { color: var(--neon-blue); font-weight: bold; font-size: 26px; text-shadow: 0 0 10px var(--neon-blue); }
+        .button-group { display: flex; gap: 15px; width: 85%; }
+        button { flex: 1; padding: 18px; border-radius: 12px; border: none; font-weight: bold; color: white; }
+        #startBtn { background: #238636; }
         #stopBtn { background: #d29922; }
         #resetBtn { background: #30363d; color: #8b949e; }
-
         #in-app-notif {
-            display: none;
-            position: fixed;
-            top: env(safe-area-inset-top, 20px);
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            background: var(--panel-bg);
-            border: 2px solid var(--neon-blue);
-            border-radius: 20px;
-            padding: 20px;
-            z-index: 4000;
-            box-shadow: 0 0 30px var(--neon-blue);
-            text-align: center;
+            display: none; position: fixed; top: env(safe-area-inset-top, 20px); left: 50%;
+            transform: translateX(-50%); width: 90%; background: var(--panel-bg);
+            border: 2px solid var(--neon-blue); border-radius: 20px; padding: 20px;
+            z-index: 4000; box-shadow: 0 0 30px var(--neon-blue); text-align: center;
         }
     </style>
 </head>
 <body>
 
 <audio id="alarm-audio" src="alarm.mp3" preload="auto" loop></audio>
+<audio id="silent-audio" loop></audio>
 
 <div id="in-app-notif">
-    <h2 style="margin:0; color:var(--neon-blue); letter-spacing:2px;">MISSION COMPLETE</h2>
-    <button onclick="resetTimer()" style="margin-top:15px; width:100%; background:var(--neon-blue); color:black;">TERMINATE ALARM</button>
+    <h2 style="margin:0; color:var(--neon-blue);">MISSION COMPLETE</h2>
+    <button onclick="resetTimer()" style="margin-top:15px; width:100%; background:var(--neon-blue); color:black; padding:10px; border-radius:5px; border:none; font-weight:bold;">STOP ALARM</button>
 </div>
 
 <div class="timer-container">
     <div class="dial-outer" id="touch-area">
         <div id="watch-dial"></div>
         <div class="picker-group" id="picker-ui">
-            <div class="picker-column-wrapper">
-                <span class="unit-label">HRS</span>
-                <div class="picker-column" id="h-col"></div>
-            </div>
-            <div class="picker-column-wrapper">
-                <span class="unit-label">MIN</span>
-                <div class="picker-column" id="m-col"></div>
-            </div>
-            <div class="picker-column-wrapper">
-                <span class="unit-label">SEC</span>
-                <div class="picker-column" id="s-col"></div>
-            </div>
+            <div class="picker-column" id="h-col"></div>
+            <div class="picker-column" id="m-col"></div>
+            <div class="picker-column" id="s-col"></div>
         </div>
     </div>
     <div class="button-group">
@@ -177,15 +80,17 @@
 
 <script>
     let timerId = null;
+    let endTime = null; // 終了予定時刻を保持
     const alarmAudio = document.getElementById('alarm-audio');
+    const silentAudio = document.getElementById('silent-audio');
     const pickerUI = document.getElementById('picker-ui');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
-    
-    // 時・分・秒の状態を個別に保持
     let state = { h: 0, m: 0, s: 0 };
 
+    // 無音データの作成（iPhoneのバックグラウンド維持用）
+    silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA== ";
+
     const createPicker = (col, max, key) => {
-        // スムーズなループのために上下に空要素
         col.innerHTML = '<div class="picker-item"></div>';
         for (let i = 0; i <= max; i++) {
             const div = document.createElement('div');
@@ -194,18 +99,12 @@
             col.appendChild(div);
         }
         col.innerHTML += '<div class="picker-item"></div>';
-
         col.onscroll = () => {
             const center = col.scrollTop + 60;
-            const items = Array.from(col.children);
-            items.forEach(item => {
-                const itemCenter = item.offsetTop + 20;
-                if (Math.abs(center - itemCenter) < 20) {
-                    item.classList.add('active');
-                    state[key] = parseInt(item.textContent) || 0;
-                } else {
-                    item.classList.remove('active');
-                }
+            Array.from(col.children).forEach(item => {
+                const isCenter = Math.abs(center - (item.offsetTop + 20)) < 20;
+                item.classList.toggle('active', isCenter);
+                if (isCenter) state[key] = parseInt(item.textContent) || 0;
             });
         };
     };
@@ -221,51 +120,47 @@
     };
 
     function resetTimer() { location.reload(); }
-
     function abortTimer() {
-        clearInterval(timerId);
-        timerId = null;
-        alarmAudio.pause();
+        clearInterval(timerId); timerId = null;
+        alarmAudio.pause(); silentAudio.pause();
         pickerUI.style.pointerEvents = 'auto';
     }
 
     document.getElementById('startBtn').onclick = () => {
         if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
 
-        // 音声準備
-        alarmAudio.volume = 0;
-        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; alarmAudio.volume = 1; });
+        // 終了時刻を確定させる
+        const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
+        endTime = Date.now() + totalMs;
+
+        // バックグラウンド維持開始
+        silentAudio.play();
+        alarmAudio.muted = true;
+        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; alarmAudio.muted = false; });
 
         pickerUI.style.pointerEvents = 'none';
 
         timerId = setInterval(() => {
-            // 正確な時計ロジック：秒が0なら分を減らす...
-            if (state.s > 0) {
-                state.s--;
-            } else {
-                if (state.m > 0) {
-                    state.s = 59;
-                    state.m--;
-                } else {
-                    if (state.h > 0) {
-                        state.s = 59;
-                        state.m = 59;
-                        state.h--;
-                    } else {
-                        // タイムアップ
-                        clearInterval(timerId);
-                        timerId = null;
-                        alarmAudio.play();
-                        document.getElementById('in-app-notif').style.display = 'block';
-                        return;
-                    }
-                }
+            const now = Date.now();
+            const diff = Math.max(0, Math.ceil((endTime - now) / 1000));
+
+            const h = Math.floor(diff / 3600);
+            const m = Math.floor((diff % 3600) / 60);
+            const s = diff % 60;
+
+            updateDisplay(h, m, s);
+
+            if (diff <= 0) {
+                clearInterval(timerId);
+                timerId = null;
+                silentAudio.pause();
+                alarmAudio.play();
+                document.getElementById('in-app-notif').style.display = 'block';
             }
-            updateDisplay(state.h, state.m, state.s);
         }, 1000);
 
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({ title: 'MISSION: IN PROGRESS' });
+            navigator.mediaSession.metadata = new MediaMetadata({ title: 'TIMER RUNNING' });
             navigator.mediaSession.setActionHandler('pause', resetTimer);
         }
     };
@@ -273,31 +168,24 @@
     document.getElementById('stopBtn').onclick = abortTimer;
     document.getElementById('resetBtn').onclick = resetTimer;
 
-    // タッチエリアの干渉防止
     const touchArea = document.getElementById('touch-area');
     touchArea.addEventListener('touchstart', (e) => {
         if (timerId || pickerUI.contains(e.target)) return;
-        
         const rect = touchArea.getBoundingClientRect();
-        const isRightSide = e.touches[0].clientX > rect.left + rect.width / 2;
-        const targetCol = isRightSide ? cols.s : cols.m;
-        const key = isRightSide ? 's' : 'm';
-
+        const isRight = e.touches[0].clientX > rect.left + rect.width / 2;
+        const targetCol = isRight ? cols.s : cols.m;
         const handle = (t) => {
             const x = t.clientX - (rect.left + rect.width / 2);
             const y = t.clientY - (rect.top + rect.height / 2);
             let angle = (Math.atan2(y, x) * (180 / Math.PI) + 450) % 360;
-            const val = Math.floor(angle / 6);
-            targetCol.scrollTo({ top: val * 40, behavior: 'auto' });
+            targetCol.scrollTo({ top: Math.floor(angle / 6) * 40, behavior: 'auto' });
         };
-
         handle(e.touches[0]);
         const move = (me) => handle(me.touches[0]);
         window.addEventListener('touchmove', move);
         window.addEventListener('touchend', () => window.removeEventListener('touchmove', move), {once:true});
     });
 
-    // 初期状態：3分
     setTimeout(() => updateDisplay(0, 3, 0, 'auto'), 200);
 </script>
 </body>
