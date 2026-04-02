@@ -121,29 +121,41 @@
         #stopBtn { background: #d29922; }
         #resetBtn { background: transparent; color: #8b949e; }
 
-        #custom-alert {
+        /* サイバー風上部通知ポップアップ */
+        #top-notification {
             display: none;
             position: fixed;
-            top: 50%;
+            top: env(safe-area-inset-top, 0); /* Notch/Dynamic Islandを避ける */
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
+            width: min(90%, 400px);
             background: var(--panel-bg);
             border: 2px solid var(--neon-blue);
-            padding: 30px;
-            border-radius: 15px;
+            border-radius: 20px;
+            padding: 15px 20px;
             z-index: 1000;
             text-align: center;
-            box-shadow: 0 0 30px var(--neon-blue);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px var(--neon-blue);
+            backdrop-filter: blur(15px);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            animation: slideDown 0.5s forwards ease-out;
         }
-        #custom-alert h2 { margin: 0 0 20px 0; color: var(--neon-blue); font-size: 24px; }
-        #close-alert {
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translate(-50%, -100%); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        #top-notification h2 { margin: 0 0 10px 0; color: var(--neon-blue); font-size: 18px; letter-spacing: 1px;}
+        #close-notif {
             background: var(--neon-blue);
             color: black;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 8px 16px;
+            border-radius: 8px;
             font-weight: bold;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -151,9 +163,9 @@
 
 <audio id="alarm-audio" src="alarm.mp3" preload="auto" loop></audio>
 
-<div id="custom-alert">
+<div id="top-notification">
     <h2>MISSION COMPLETE</h2>
-    <button id="close-alert">STOP ALARM</button>
+    <button id="close-notif">STOP ALARM</button>
 </div>
 
 <div class="timer-container">
@@ -184,21 +196,32 @@
     const pickerUI = document.getElementById('picker-ui');
     const touchArea = document.getElementById('touch-area');
     const alarmAudio = document.getElementById('alarm-audio');
-    const customAlert = document.getElementById('custom-alert');
+    const topNotification = document.getElementById('top-notification');
 
-    // ロック画面のメディア操作を設定
+    // 1. ロック画面（Media Session）の統合設定
     function setupMediaSession() {
         if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: 'Grand Mission Timer',
-                artist: 'Mission Accomplished',
-                album: 'Timer Alarm'
+                artist: 'OPERATION COMPLETE',
+                album: 'Cyber Alarm'
             });
 
-            // ロック画面の「停止/再生」ボタンが押された時の処理
+            // ロック画面のメディア操作イベントをフック
             navigator.mediaSession.setActionHandler('pause', stopEverything);
             navigator.mediaSession.setActionHandler('stop', stopEverything);
+            // （オプション）前後の曲ボタンを無効化
+            navigator.mediaSession.setActionHandler('previoustrack', null);
+            navigator.mediaSession.setActionHandler('nexttrack', null);
         }
+    }
+
+    // 2. タイマー終了時の挙动（音楽と上部通知）
+    function onTimerComplete() {
+        clearInterval(timerId); timerId = null;
+        setupMediaSession(); // タイマー終了時にメディア情報を更新
+        alarmAudio.play().catch(e => console.log("再生失敗:", e)); // 音楽再生
+        topNotification.style.display = "block"; // 上部通知を表示
     }
 
     function stopEverything() {
@@ -208,9 +231,8 @@
         }
         alarmAudio.pause();
         alarmAudio.currentTime = 0;
-        customAlert.style.display = "none";
+        topNotification.style.display = "none";
         pickerUI.style.pointerEvents = "auto";
-        // 画面をリセット
         location.reload();
     }
 
@@ -268,12 +290,10 @@
     }
 
     document.getElementById('startBtn').onclick = () => {
-        setupMediaSession();
-        // ダミー再生でブラウザの制限を解除
-        alarmAudio.play().then(() => {
-            alarmAudio.pause();
-            alarmAudio.currentTime = 0;
-        }).catch(() => {});
+        // iPhoneでの再生制限を解除するためのダミー再生
+        alarmAudio.play();
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
 
         if (timerId) return;
         const getVal = (col) => {
@@ -290,14 +310,12 @@
             setVal(mCol, Math.floor((timeLeft % 3600) / 60));
             setVal(sCol, timeLeft % 60);
             if (timeLeft <= 0) {
-                clearInterval(timerId); timerId = null;
-                alarmAudio.play();
-                customAlert.style.display = "block";
+                onTimerComplete(); // タイマー終了
             }
         }, 1000);
     };
 
-    document.getElementById('close-alert').onclick = stopEverything;
+    document.getElementById('close-notif').onclick = stopEverything;
     document.getElementById('stopBtn').onclick = stopEverything;
     document.getElementById('resetBtn').onclick = () => location.reload();
 </script>
