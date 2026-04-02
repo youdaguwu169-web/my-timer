@@ -1,11 +1,11 @@
+// sw.js
 self.addEventListener('push', function(event) {
-    const data = event.data.json();
-    self.registration.showNotification(data.title, {
-        body: data.body,
-        icon: 'icon.png'
-    });
-});
-
-self.addEventListener('notificationclick', function(event) {
-    event.notification.close();
+    const options = {
+        body: 'MISSION COMPLETE',
+        icon: 'icon.png', // もしアイコンがあれば
+        badge: 'icon.png'
+    };
+    event.waitUntil(
+        self.registration.showNotification('Grand Mission Timer', options)
+    );
 });
