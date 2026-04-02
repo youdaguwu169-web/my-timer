@@ -34,7 +34,7 @@
         .picker-item { height: 40px; line-height: 40px; font-size: 20px; color: #484f58; text-align: center; scroll-snap-align: center; }
         .picker-item.active { color: var(--neon-blue); font-weight: bold; font-size: 26px; text-shadow: 0 0 10px var(--neon-blue); }
         .button-group { display: flex; gap: 15px; width: 85%; }
-        button { flex: 1; padding: 18px; border-radius: 12px; border: none; font-weight: bold; color: white; }
+        button { flex: 1; padding: 18px; border-radius: 12px; border: none; font-weight: bold; color: white; cursor: pointer; }
         #startBtn { background: #238636; }
         #stopBtn { background: #d29922; }
         #resetBtn { background: #30363d; color: #8b949e; }
@@ -74,26 +74,32 @@
 <script>
     let timerId = null;
     let endTime = null;
-    let keepAliveOsc = null;
     let audioCtx = null;
+    let silenceOsc = null;
     const alarmAudio = document.getElementById('alarm-audio');
     const pickerUI = document.getElementById('picker-ui');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
     let state = { h: 0, m: 0, s: 0 };
 
-    // 人間には聞こえない20Hzの音で、iPhoneのバックグラウンド動作を維持
-    function startKeepAlive() {
+    // 通知の許可設定
+    async function requestNotificationPermission() {
+        if ("Notification" in window) {
+            const permission = await Notification.requestPermission();
+            console.log("Notification status:", permission);
+        }
+    }
+
+    // ブラウザを眠らせないための無音再生
+    function startSilence() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') audioCtx.resume();
-        
-        keepAliveOsc = audioCtx.createOscillator();
-        const lowGain = audioCtx.createGain();
-        keepAliveOsc.type = 'sine';
-        keepAliveOsc.frequency.setValueAtTime(20, audioCtx.currentTime); 
-        lowGain.gain.setValueAtTime(0.001, audioCtx.currentTime); 
-        keepAliveOsc.connect(lowGain);
-        lowGain.connect(audioCtx.destination);
-        keepAliveOsc.start();
+        silenceOsc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        silenceOsc.frequency.setValueAtTime(1, audioCtx.currentTime); // 人間には聞こえない周波数
+        gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
+        silenceOsc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        silenceOsc.start();
     }
 
     const createPicker = (col, max, key) => {
@@ -129,24 +135,27 @@
     
     function abortTimer() {
         clearInterval(timerId); timerId = null;
-        if (keepAliveOsc) { try { keepAliveOsc.stop(); } catch(e){} keepAliveOsc = null; }
-        alarmAudio.pause();
-        alarmAudio.currentTime = 0;
+        if (silenceOsc) { silenceOsc.stop(); silenceOsc = null; }
+        alarmAudio.pause(); alarmAudio.currentTime = 0;
         pickerUI.style.pointerEvents = 'auto';
     }
 
-    document.getElementById('startBtn').onclick = () => {
+    document.getElementById('startBtn').onclick = async () => {
         if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
 
-        // 1. 開始時にはこれだけを呼ぶ（超低音でiPhoneを騙す）
-        startKeepAlive();
-        
-        // 2. alarm.mp3 はここでは再生せず、権限だけ確保（無音バッファを流す）
-        const buffer = audioCtx.createBuffer(1, 1, 22050);
-        const source = audioCtx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioCtx.destination);
-        source.start(0);
+        // 【重要】開始時に通知の許可を求める
+        await requestNotificationPermission();
+
+        // 【重要】ブラウザの休止を防ぐ無音開始
+        startSilence();
+
+        // アラーム音の再生権限を一瞬で確保（音漏れ防止のため即停止）
+        alarmAudio.volume = 0;
+        alarmAudio.play().then(() => {
+            alarmAudio.pause();
+            alarmAudio.currentTime = 0;
+            alarmAudio.volume = 1.0;
+        });
 
         const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
         endTime = Date.now() + totalMs;
@@ -160,19 +169,22 @@
             if (diff <= 0) {
                 clearInterval(timerId);
                 timerId = null;
-                if (keepAliveOsc) { try { keepAliveOsc.stop(); } catch(e){} keepAliveOsc = null; }
+                if (silenceOsc) { silenceOsc.stop(); silenceOsc = null; }
                 
-                // 3. 0秒になった瞬間に初めて alarm.mp3 を再生
-                alarmAudio.volume = 1.0;
-                alarmAudio.play().catch(e => console.log("Final play failed:", e));
+                // 1. 音を鳴らす
+                alarmAudio.play();
+
+                // 2. 他のアプリを開いていても通知を出す
+                if (Notification.permission === "granted") {
+                    new Notification("Grand Mission", {
+                        body: "MISSION COMPLETE! タイマーが終了しました。",
+                        icon: "icon.png" // 任意
+                    });
+                }
+                
                 document.getElementById('in-app-notif').style.display = 'block';
             }
         }, 1000);
-
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({ title: 'MISSION IN PROGRESS' });
-            navigator.mediaSession.setActionHandler('pause', abortTimer);
-        }
     };
 
     document.getElementById('stopBtn').onclick = abortTimer;
