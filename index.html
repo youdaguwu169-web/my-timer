@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Grand Mission Timer</title>
     <style>
-        :root {
-            --neon-blue: #00d2ff;
-            --panel-bg: rgba(22, 27, 34, 0.9);
-        }
+        :root { --neon-blue: #00d2ff; --panel-bg: rgba(22, 27, 34, 0.9); }
         body {
             font-family: 'Courier New', sans-serif;
             background: radial-gradient(circle at center, #1a1f25 0%, #0d1117 100%) fixed;
@@ -34,10 +31,7 @@
             scrollbar-width: none; scroll-snap-type: y mandatory;
         }
         .picker-column::-webkit-scrollbar { display: none; }
-        .picker-item {
-            height: 40px; line-height: 40px; font-size: 20px; color: #484f58;
-            text-align: center; scroll-snap-align: center;
-        }
+        .picker-item { height: 40px; line-height: 40px; font-size: 20px; color: #484f58; text-align: center; scroll-snap-align: center; }
         .picker-item.active { color: var(--neon-blue); font-weight: bold; font-size: 26px; text-shadow: 0 0 10px var(--neon-blue); }
         .button-group { display: flex; gap: 15px; width: 85%; }
         button { flex: 1; padding: 18px; border-radius: 12px; border: none; font-weight: bold; color: white; }
@@ -55,11 +49,10 @@
 <body>
 
 <audio id="alarm-audio" src="alarm.mp3" preload="auto" loop></audio>
-<audio id="silent-audio" loop></audio>
 
 <div id="in-app-notif">
     <h2 style="margin:0; color:var(--neon-blue);">MISSION COMPLETE</h2>
-    <button onclick="resetTimer()" style="margin-top:15px; width:100%; background:var(--neon-blue); color:black; padding:10px; border-radius:5px; border:none; font-weight:bold;">STOP ALARM</button>
+    <button onclick="resetTimer()" style="margin-top:15px; width:100%; background:var(--neon-blue); color:black; padding:12px; border-radius:8px; border:none; font-weight:bold;">STOP ALARM</button>
 </div>
 
 <div class="timer-container">
@@ -82,13 +75,9 @@
     let timerId = null;
     let endTime = null;
     const alarmAudio = document.getElementById('alarm-audio');
-    const silentAudio = document.getElementById('silent-audio');
     const pickerUI = document.getElementById('picker-ui');
     const cols = { h: document.getElementById('h-col'), m: document.getElementById('m-col'), s: document.getElementById('s-col') };
     let state = { h: 0, m: 0, s: 0 };
-
-    // 無音音源（これがないとバックグラウンドで止まります）
-    silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA== ";
 
     const createPicker = (col, max, key) => {
         col.innerHTML = '<div class="picker-item"></div>';
@@ -123,62 +112,42 @@
     
     function abortTimer() {
         clearInterval(timerId); timerId = null;
-        alarmAudio.pause(); silentAudio.pause();
+        alarmAudio.pause();
+        alarmAudio.volume = 0;
         pickerUI.style.pointerEvents = 'auto';
     }
 
     document.getElementById('startBtn').onclick = () => {
         if (timerId || (state.h === 0 && state.m === 0 && state.s === 0)) return;
 
-        // 【バックグラウンド対応】終了予定時刻を絶対時刻で固定
         const totalMs = (state.h * 3600 + state.m * 60 + state.s) * 1000;
         endTime = Date.now() + totalMs;
 
-        // 【バックグラウンド対応】無音を流してプロセスを維持
-        silentAudio.play().catch(e => console.log("Silent Play Error:", e));
-        
-        // アラームの再生許可（一瞬鳴らして止める）
-        alarmAudio.muted = true;
+        // 【ここが重要】開始時に音量0で再生を開始しておく
+        alarmAudio.volume = 0;
         alarmAudio.play().then(() => {
-            alarmAudio.pause();
-            alarmAudio.currentTime = 0;
-            alarmAudio.muted = false;
-        });
+            console.log("Audio session unlocked");
+        }).catch(e => console.log("Unlock failed", e));
 
         pickerUI.style.pointerEvents = 'none';
 
         timerId = setInterval(() => {
             const now = Date.now();
             const diff = Math.max(0, Math.ceil((endTime - now) / 1000));
+            updateDisplay(Math.floor(diff/3600), Math.floor((diff%3600)/60), diff%60);
 
-            const h = Math.floor(diff / 3600);
-            const m = Math.floor((diff % 3600) / 60);
-            const s = diff % 60;
-
-            updateDisplay(h, m, s);
-
-            // 0秒になった時
             if (diff <= 0) {
                 clearInterval(timerId);
                 timerId = null;
-                silentAudio.pause();
-                alarmAudio.play();
+                // 0になったら音量を1にする
+                alarmAudio.volume = 1.0; 
                 document.getElementById('in-app-notif').style.display = 'block';
-                
-                // ロック画面に通知
-                if ('mediaSession' in navigator) {
-                    navigator.mediaSession.playbackState = 'playing';
-                }
             }
         }, 1000);
 
-        // ロック画面への情報送信
         if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: 'Timer Active',
-                artist: 'Grand Mission'
-            });
-            navigator.mediaSession.setActionHandler('pause', resetTimer);
+            navigator.mediaSession.metadata = new MediaMetadata({ title: 'MISSION ACTIVE', artist: 'Timer' });
+            navigator.mediaSession.setActionHandler('pause', abortTimer);
         }
     };
 
